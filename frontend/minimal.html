@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal Test - OOPsy-daisy Google Drive</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #4285f4;
+    }
+    .button {
+      display: inline-block;
+      background-color: #4285f4;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 4px;
+      text-decoration: none;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>OOPsy-daisy Google Drive Integration</h1>
+    <p>This is a minimal test page to check if basic rendering is working.</p>
+    <p>If you can see this page, then your Electron application is rendering HTML correctly.</p>
+    <p>The issue might be with your Vue application, CSS, or API connections.</p>
+    <a href="#" class="button" onclick="showInfo()">Show Environment Info</a>
+    <div id="info" style="display: none; margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #4285f4;">
+      <h3>Environment Information</h3>
+      <pre id="env-info">Loading...</pre>
+    </div>
+  </div>
+
+  <script>
+    // Simple script to display some information
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('Minimal test page loaded successfully');
+    });
+
+    function showInfo() {
+      const infoDiv = document.getElementById('info');
+      const infoContent = document.getElementById('env-info');
+      
+      if (infoDiv.style.display === 'none') {
+        infoDiv.style.display = 'block';
+        
+        // Collect some basic environment info
+        const info = {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          screenSize: `${window.screen.width}x${window.screen.height}`,
+          time: new Date().toLocaleString(),
+          electronAPI: window.electronAPI ? 'Available' : 'Not available'
+        };
+        
+        infoContent.textContent = JSON.stringify(info, null, 2);
+      } else {
+        infoDiv.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html> 

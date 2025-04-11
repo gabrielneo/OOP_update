@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Redirect</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .message {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        #debugInfo {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Authentication Complete</h1>
+        
+        <div id="status-message" class="message">
+            Processing your authentication...
+        </div>
+        
+        <div>
+            <button id="redirectButton">Continue to Application</button>
+            <button id="debugButton">Show Environment Info</button>
+        </div>
+        
+        <div id="debugInfo" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Function to parse URL query parameters
+        function getQueryParams() {
+            const params = {};
+            const queryString = window.location.search.substring(1);
+            const pairs = queryString.split('&');
+            
+            for (let i = 0; i < pairs.length; i++) {
+                const pair = pairs[i].split('=');
+                params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1] || '');
+            }
+            
+            return params;
+        }
+        
+        // Function to collect debug information
+        function getDebugInfo() {
+            return {
+                url: window.location.href,
+                hostname: window.location.hostname,
+                pathname: window.location.pathname,
+                search: window.location.search,
+                userAgent: navigator.userAgent,
+                queryParams: getQueryParams(),
+                timestamp: new Date().toISOString()
+            };
+        }
+        
+        // Handle page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = getQueryParams();
+            const statusMessage = document.getElementById('status-message');
+            const debugInfo = document.getElementById('debugInfo');
+            const redirectButton = document.getElementById('redirectButton');
+            const debugButton = document.getElementById('debugButton');
+            
+            // Check for error parameters
+            if (params.error) {
+                statusMessage.className = 'message error';
+                statusMessage.textContent = `Authentication Error: ${params.error}`;
+                if (params.message) {
+                    statusMessage.textContent += ` - ${params.message}`;
+                }
+            } else {
+                statusMessage.className = 'message success';
+                statusMessage.textContent = 'Authentication successful! You can now continue to the application.';
+            }
+            
+            // Set debug info
+            const debug = getDebugInfo();
+            debugInfo.textContent = JSON.stringify(debug, null, 2);
+            
+            // Handle continue button click
+            redirectButton.addEventListener('click', function() {
+                // Prefer saved redirect URL or fallback to app origin
+                const redirectUrl = localStorage.getItem('auth_redirect') || 
+                    `${window.location.protocol}//${window.location.hostname}:3000`;
+                
+                // Clear any saved redirect
+                localStorage.removeItem('auth_redirect');
+                
+                // Redirect to frontend
+                window.location.href = redirectUrl;
+            });
+            
+            // Handle debug button click
+            debugButton.addEventListener('click', function() {
+                debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+    </script>
+</body>
+</html> 
