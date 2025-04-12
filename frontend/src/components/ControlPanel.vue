@@ -41,6 +41,8 @@
               :disabled="selectedRatio !== 'custom'"
               class="size-input"
               :class="{ disabled: selectedRatio !== 'custom' }"
+              step="0.1"
+              min="0.1"
             />
             ×
             <input
@@ -51,6 +53,8 @@
               :disabled="selectedRatio !== 'custom'"
               class="size-input"
               :class="{ disabled: selectedRatio !== 'custom' }"
+              step="0.1"
+              min="0.1"
             />
           </div>
           <button
@@ -544,16 +548,16 @@ export default {
   },
   methods: {
     applyDimensions() {
-      const width = Math.max(1, parseInt(this.localCropWidth) || 35);
-      const height = Math.max(1, parseInt(this.localCropHeight) || 45);
+      const width = Math.max(0.1, parseFloat(this.localCropWidth) || 35);
+      const height = Math.max(0.1, parseFloat(this.localCropHeight) || 45);
 
-      this.localCropWidth = width;
-      this.localCropHeight = height;
+      this.localCropWidth = parseFloat(width.toFixed(1)); // Keep one decimal place
+      this.localCropHeight = parseFloat(height.toFixed(1)); // Keep one decimal place
 
-      this.$emit("update:cropWidth", width);
-      this.$emit("update:cropHeight", height);
+      this.$emit("update:cropWidth", this.localCropWidth);
+      this.$emit("update:cropHeight", this.localCropHeight);
 
-      this.$emit("apply-dimensions", { width, height });
+      this.$emit("apply-dimensions", { width: this.localCropWidth, height: this.localCropHeight });
     },
     getFeatureTitle(feature) {
       const titles = {
@@ -572,8 +576,8 @@ export default {
       this.selectedRatio = ratio;
       if (ratio !== "custom") {
         const [width, height] = ratio.split(":");
-        const parsedWidth = parseInt(width);
-        const parsedHeight = parseInt(height);
+        const parsedWidth = parseFloat(width);
+        const parsedHeight = parseFloat(height);
 
         this.localCropWidth = parsedWidth;
         this.localCropHeight = parsedHeight;
@@ -767,22 +771,22 @@ export default {
       this.$emit("apply-changes", changes);
     },
     updateWidth(event) {
-      const value = parseInt(event.target.value) || 1;
+      const value = parseFloat(event.target.value) || 1;
       this.localCropWidth = value;
     },
     updateHeight(event) {
-      const value = parseInt(event.target.value) || 1;
+      const value = parseFloat(event.target.value) || 1;
       this.localCropHeight = value;
     },
     applyWidth() {
-      const value = Math.max(1, this.localCropWidth);
-      this.localCropWidth = value;
-      this.$emit("update:cropWidth", value);
+      const value = Math.max(0.1, this.localCropWidth);
+      this.localCropWidth = parseFloat(value.toFixed(1)); // Keep one decimal place
+      this.$emit("update:cropWidth", this.localCropWidth);
     },
     applyHeight() {
-      const value = Math.max(1, this.localCropHeight);
-      this.localCropHeight = value;
-      this.$emit("update:cropHeight", value);
+      const value = Math.max(0.1, this.localCropHeight);
+      this.localCropHeight = parseFloat(value.toFixed(1)); // Keep one decimal place
+      this.$emit("update:cropHeight", this.localCropHeight);
     },
     calculateHeightFromWidth() {
       if (this.originalAspectRatio && this.resizeWidth > 0) {
