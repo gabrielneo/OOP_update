@@ -48,7 +48,10 @@
         :cropWidthMm="cropWidth"
         :cropHeightMm="cropHeight"
         :imageDimensions="imageDimensions"
+        :maintain-aspect-ratio="true"
+        v-model:hide-crop-on-apply="hideCropOnApply"
         @crop-area="cropArea = $event"
+        @crop-complete="handleCropComplete"
         @resize-dimensions="handleResizeDimensions"
       />
 
@@ -107,6 +110,7 @@ export default {
       // For enhancement preview throttling
       previewThrottleTimeout: null,
       isPreviewLoading: false,
+      hideCropOnApply: false,
     };
   },
   watch: {
@@ -373,6 +377,12 @@ export default {
       // Don't apply resize automatically - wait for user to click Apply button
     },
 
+    // Add a handler for crop completion
+    handleCropComplete() {
+      console.log('Crop operation completed and mask hidden');
+      // Can add additional logic here if needed
+    },
+
     // Update the applyChanges method to handle resize
     async applyChanges(changes) {
       console.log("Applying changes:", changes);
@@ -438,9 +448,12 @@ export default {
 
             // Clear crop related state
             this.cropArea = null;
-            if (this.$refs.imageComponent) {
-              this.$refs.imageComponent.clearCropBox();
-            }
+            
+            // Hide the crop mask and control panel by setting activeFeature to null
+            this.activeFeature = null;
+            
+            // Show success notification
+            this.showNotification("Image cropped successfully!", "success");
           } else {
             console.error("Failed to crop image:", await cropResponse.text());
           }
