@@ -418,10 +418,20 @@
         </div>
       </div>
     </div>
+
+    <compliance-check-modal
+      :is-visible="complianceCheck.isModalVisible"
+      :loading="complianceCheck.loading"
+      :result="complianceCheck.result"
+      @close="closeComplianceModal"
+    />
   </div>
 </template>
 
 <script>
+import ComplianceService from '../services/compliance-service';
+import ComplianceCheckModal from './ComplianceCheckModal.vue';
+
 export default {
   props: {
     feature: {
@@ -438,6 +448,10 @@ export default {
     },
     imageDimensions: {
       type: Object,
+      default: null,
+    },
+    image: {
+      type: String,
       default: null,
     },
   },
@@ -503,7 +517,20 @@ export default {
 
       // clothes
       selectedClothingType: "formal",
+
+      complianceCheck: {
+        isModalVisible: false,
+        loading: false,
+        result: {
+          compliant: false,
+          issues: [],
+          message: 'Compliance check not performed yet'
+        }
+      },
     };
+  },
+  components: {
+    ComplianceCheckModal
   },
   watch: {
     cropWidth: {
@@ -1016,6 +1043,86 @@ export default {
       // Reset and recalculate
       this.resetLayoutCalculations();
       await this.calculateLayoutDimensions();
+    },
+    async checkCompliance() {
+      this.complianceCheck.isModalVisible = true;
+      this.complianceCheck.loading = true;
+      
+      try {
+        // First test the backend connection
+        const isBackendAvailable = await ComplianceService.testBackendConnection();
+        
+        if (!isBackendAvailable) {
+          this.complianceCheck.result = {
+            compliant: false,
+            issues: [
+              'Cannot connect to the backend server.',
+              'Make sure the Spring Boot backend is running on port 8080.',
+              'Try starting the server with: cd backend && mvn spring-boot:run'
+            ],
+            message: 'Backend server not available'
+          };
+          this.complianceCheck.loading = false;
+          return;
+        }
+        
+        // Check if image is available
+        if (!this.image) {
+          // If no image prop, emit an event to request the current image
+          this.$emit('request-image-for-compliance');
+          
+          // Add a delay to allow the parent component to provide the image
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // If still no image, show error
+          if (!this.image) {
+            this.complianceCheck.result = {
+              compliant: false,
+              issues: ['No image is currently loaded. Please load an image first.'],
+              message: 'No image to check'
+            };
+            this.complianceCheck.loading = false;
+            return;
+          }
+        }
+        
+        console.log("Starting compliance check with image:", this.image ? (typeof this.image === 'string' ? this.image.substring(0, 30) + "..." : "Image blob") : "No image");
+        
+        // Process the image (handles both blob URLs and base64 strings)
+        const imageBlob = await ComplianceService.processImageForCompliance(this.image);
+        
+        if (!imageBlob) {
+          console.error("Failed to process image");
+          this.complianceCheck.result = {
+            compliant: false,
+            issues: ['Could not process image data. The image may be invalid or corrupted.'],
+            message: 'Image processing error'
+          };
+          return;
+        }
+        
+        console.log("Image processed successfully, size:", imageBlob.size);
+        
+        // Send to compliance service
+        const result = await ComplianceService.checkImageCompliance(imageBlob);
+        console.log("Received compliance result:", result);
+        
+        // Update the result
+        this.complianceCheck.result = result;
+      } catch (error) {
+        console.error('Error during compliance check:', error);
+        this.complianceCheck.result = {
+          compliant: false,
+          issues: [(error.message || 'An unexpected error occurred during compliance check')],
+          message: 'Compliance check failed'
+        };
+      } finally {
+        console.log("Compliance check complete");
+        this.complianceCheck.loading = false;
+      }
+    },
+    closeComplianceModal() {
+      this.complianceCheck.isModalVisible = false;
     },
   },
 };

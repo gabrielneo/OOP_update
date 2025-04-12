@@ -55,7 +55,14 @@
         <i-lucide-redo-2 class="icon" />
         <span>Reset</span>
       </button>
-        <span>‎ ‎ ‎ </span>
+      <button
+        class="header-btn compliance-check-btn"
+        @click="$emit('check-compliance')"
+        title="Check Image Compliance"
+      >
+        <span>✓</span>
+        <span class="compliance-text">Check Compliance</span>
+      </button>
     </div>
 
     <!-- Export Dialog -->
@@ -109,7 +116,7 @@ export default {
       exportFilename: "",
     };
   },
-  emits: ["new-project", "save-project", "export-project", "undo", "redo", "reset"],
+  emits: ["new-project", "save-project", "export-project", "undo", "redo", "reset", "check-compliance"],
   mounted() {
     // Add keyboard shortcuts
     document.addEventListener('keydown', this.handleKeyboardShortcuts);
@@ -267,6 +274,21 @@ export default {
 
 .undo-redo-btn:disabled {
   color: #5a5f65;
+}
+
+.compliance-check-btn {
+  margin-left: 16px;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+}
+
+.compliance-check-btn span {
+  color: black;
+}
+
+.compliance-text {
+  color: black;
+  font-weight: 500;
 }
 
 @media (max-width: 1200px) {

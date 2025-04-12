@@ -15,6 +15,7 @@
       @undo="undoAction"
       @reset="resetAction"
       @redo="redoAction"
+      @check-compliance="checkImageCompliance"
       :canUndo="canUndo"
       :canRedo="canRedo"
       :canReset="canReset"
@@ -55,10 +56,12 @@
       <!-- Control Panel Component (only shown when a feature is selected) -->
       <ControlPanel
         v-if="activeFeature"
+        ref="controlPanel"
         :feature="activeFeature"
         :cropWidth="cropWidth"
         :cropHeight="cropHeight"
         :imageDimensions="imageDimensions"
+        :image="currentPhoto"
         @update:cropWidth="cropWidth = $event"
         @update:cropHeight="cropHeight = $event"
         @apply-changes="applyChanges"
@@ -66,6 +69,7 @@
         @faceDetectionChange="handleFaceDetectionChange"
         @upload-background-image="handleBackgroundImageUpload"
         @enhancement-preview="handleEnhancementPreview"
+        @request-image-for-compliance="provideImageForCompliance"
         @close="closeControlPanel"
       />
     </div>
@@ -1140,6 +1144,36 @@ export default {
     handleAuthRequired() {
       console.log("Authentication required for Google Drive");
       this.showNotification("Please log in to Google Drive first by using the 'Import from Google Drive' button", "warning");
+    },
+
+    provideImageForCompliance() {
+      console.log("Image requested for compliance check");
+      if (this.currentPhoto) {
+        // Pass the current image to the control panel component
+        const controlPanel = this.$refs.controlPanel;
+        if (controlPanel) {
+          controlPanel.image = this.currentPhoto;
+        }
+      } else {
+        console.error("No image available for compliance check");
+      }
+    },
+
+    checkImageCompliance() {
+      // Trigger the compliance check in the control panel
+      if (this.$refs.controlPanel) {
+        this.$refs.controlPanel.checkCompliance();
+      } else {
+        // If control panel isn't active, we need to create and show it
+        this.setActiveFeature('compliance-check');
+        
+        // Wait for the component to be created before calling its method
+        this.$nextTick(() => {
+          if (this.$refs.controlPanel) {
+            this.$refs.controlPanel.checkCompliance();
+          }
+        });
+      }
     },
   },
   mounted() {
