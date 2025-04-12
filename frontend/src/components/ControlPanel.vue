@@ -201,24 +201,19 @@
         <div class="template-options">
           <div 
             class="template-option" 
-            :class="{ active: selectedClothingType === 'formal' }"
-            @click="setClothingType('formal')"
+            :class="{ active: selectedClothingType === 'male' }"
+            @click="setClothingType('male')"
           >
             <span>Formal Suit</span>
+            <span>(Male)</span>
           </div>
           <div 
             class="template-option" 
-            :class="{ active: selectedClothingType === 'business' }"
-            @click="setClothingType('business')"
+            :class="{ active: selectedClothingType === 'female' }"
+            @click="setClothingType('female')"
           >
-            <span>Business Casual</span>
-          </div>
-          <div 
-            class="template-option" 
-            :class="{ active: selectedClothingType === 'dress' }"
-            @click="setClothingType('dress')"
-          >
-            <span>Formal Dress</span>
+          <span>Formal Suit</span>
+          <span>(Female)</span>
           </div>
         </div>
       </div>
@@ -502,7 +497,7 @@ export default {
       originalWithBorderHeight: 0,
 
       // clothes
-      selectedClothingType: "formal",
+      selectedClothingType: "male",
     };
   },
   watch: {

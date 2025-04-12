@@ -75,9 +75,8 @@ public class ClothingReplacementService {
 
     // Consistent clothing image paths
     private final Map<String, String> CLOTHING_IMAGES = Map.of(
-        "formal", "Clothe images/Suit.png",
-        "business", "Clothe images/BusinessCasual.png", 
-        "dress", "Clothe images/FormalDress.png"
+        "male", "Clothe images/MaleSuit.png",
+        "female", "Clothe images/FemaleSuit.png"
     );
     
     private final String MODEL_PATH = "models/segformer_b2_clothes.onnx";

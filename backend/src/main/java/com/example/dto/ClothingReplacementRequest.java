@@ -6,12 +6,12 @@ public class ClothingReplacementRequest {
 
     public ClothingReplacementRequest() {
         this.type = "clothes";
-        this.clothingType = "formal"; // Default to formal suit
+        this.clothingType = "male"; // Default to formal male suit
     }
     
     public ClothingReplacementRequest(String type, String clothingType) {
         this.type = type != null ? type : "clothes";
-        this.clothingType = clothingType != null ? clothingType : "formal";
+        this.clothingType = clothingType != null ? clothingType : "male";
     }
     
     public String getType() {
