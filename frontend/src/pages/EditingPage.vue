@@ -435,6 +435,62 @@ export default {
         } catch (error) {
           console.error("Error resizing image:", error);
         }
+      } else if (changes.type === "clothes") {
+        try {
+          // Create loading indicator
+          const loadingIndicator = document.createElement("div");
+          loadingIndicator.textContent = "Applying clothing replacement...";
+          loadingIndicator.style.position = "fixed";
+          loadingIndicator.style.top = "50%";
+          loadingIndicator.style.left = "50%";
+          loadingIndicator.style.transform = "translate(-50%, -50%)";
+          loadingIndicator.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+          loadingIndicator.style.color = "white";
+          loadingIndicator.style.padding = "15px 30px";
+          loadingIndicator.style.borderRadius = "8px";
+          loadingIndicator.style.zIndex = "9999";
+
+          // Add the loading indicator
+          document.body.appendChild(loadingIndicator);
+
+          const response = await fetch(
+            "http://localhost:8080/api/clothes-replace",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "clothes",
+                clothingType: changes.clothingType || "formal"
+              }),
+            }
+          );
+
+          // Remove loading indicator
+          if (document.body.contains(loadingIndicator)) {
+            document.body.removeChild(loadingIndicator);
+          }
+
+          if (response.ok) {
+            // Update the image and all related state
+            await this.updateImageAfterEdit();
+            
+            // Show success notification
+            this.showNotification(
+              "Clothing replacement applied successfully!",
+              "success"
+            );
+          } else {
+            const errorText = await response.text();
+            console.error("Failed to replace clothing:", errorText);
+            this.showNotification(
+              "Failed to replace clothing: " + errorText,
+              "error"
+            );
+          }
+        } catch (error) {
+          console.error("Error replacing clothing:", error);
+          this.showNotification("Error: " + error.message, "error");
+        }
       } else if (changes.type === "background-remove") {
         try {
           const response = await fetch(

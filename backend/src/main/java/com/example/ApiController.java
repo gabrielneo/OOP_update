@@ -4,6 +4,7 @@ import com.example.dto.CropRequest;
 import com.example.dto.ResizeRequest;
 import com.example.dto.BackgroundRemovalRequest;
 import com.example.dto.BackgroundReplaceRequest;
+import com.example.dto.ClothingReplacementRequest;
 import com.example.dto.FaceCenteringRequest;
 import com.example.dto.PhotoEnhanceRequest;
 import com.example.dto.PhotoLayoutRequest;
@@ -12,6 +13,7 @@ import com.example.services.CropImageService;
 import com.example.services.ResizeImageService;
 import com.example.services.BackgroundRemovalService;
 import com.example.services.BackgroundReplaceService;
+import com.example.services.ClothingReplacementService;
 import com.example.services.FaceCenteringService;
 import com.example.services.PhotoEnhanceService;
 import com.example.services.PhotoLayoutService;
@@ -49,6 +51,9 @@ public class ApiController {
     
     @Autowired
     private BackgroundReplaceService backgroundReplaceService;
+    
+    @Autowired
+    private ClothingReplacementService clothingReplacementService;
     
     @Autowired
     private FaceCenteringService faceCenteringService;
@@ -107,6 +112,13 @@ public class ApiController {
         // Clear any stored reference image as the base image is changing
         state.clearReferenceImage();
         return backgroundReplaceService.replaceBackground(request, state);
+    }
+    
+    @PostMapping("/clothes-replace")
+    public ResponseEntity<?> replaceClothing(@RequestBody ClothingReplacementRequest request) {
+        // Clear any stored reference image as the base image is changing
+        state.clearReferenceImage();
+        return clothingReplacementService.replaceClothing(request, state);
     }
     
     @PostMapping("/detect-face")

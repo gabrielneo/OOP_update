@@ -192,30 +192,39 @@
 
       <!-- Clothes replacement controls -->
       <div v-if="feature === 'clothes'" class="control-group">
-        <div class="control-item">
-          <label>Select Clothing Template</label>
-          <div class="template-options">
-            <div class="template-option">
-              <!-- <img src="/placeholder.svg?height=60&width=60" alt="Formal Suit" /> -->
-              <span>Formal Suit</span>
-            </div>
-            <div class="template-option">
-              <!-- <img src="/placeholder.svg?height=60&width=60" alt="Business Casual" /> -->
-              <span>Business Casual</span>
-            </div>
-            <div class="template-option">
-              <!-- <img src="/placeholder.svg?height=60&width=60" alt="Formal Dress" /> -->
-              <span>Formal Dress</span>
-            </div>
+      <div class="control-item">
+        <label>Select Clothing Template</label>
+        <div class="template-options">
+          <div 
+            class="template-option" 
+            :class="{ active: selectedClothingType === 'formal' }"
+            @click="setClothingType('formal')"
+          >
+            <span>Formal Suit</span>
+          </div>
+          <div 
+            class="template-option" 
+            :class="{ active: selectedClothingType === 'business' }"
+            @click="setClothingType('business')"
+          >
+            <span>Business Casual</span>
+          </div>
+          <div 
+            class="template-option" 
+            :class="{ active: selectedClothingType === 'dress' }"
+            @click="setClothingType('dress')"
+          >
+            <span>Formal Dress</span>
           </div>
         </div>
-        <div class="control-actions">
-          <button class="action-btn" @click="applyChanges">Apply</button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
-        </div>
       </div>
+      <div class="control-actions">
+        <button class="action-btn" @click="applyChanges">Apply</button>
+        <button class="action-btn secondary" @click="resetControls">
+          Reset
+        </button>
+      </div>
+    </div>
 
       <!-- Face centering controls -->
       <div v-if="feature === 'face'" class="control-group">
@@ -487,6 +496,9 @@ export default {
       customCols: 2,
       originalWithBorderWidth: 0,
       originalWithBorderHeight: 0,
+
+      // clothes
+      selectedClothingType: "formal",
     };
   },
   watch: {
@@ -606,6 +618,9 @@ export default {
         detectMultipleFaces: this.detectMultipleFaces,
       });
     },
+    setClothingType(type) {
+    this.selectedClothingType = type;
+    },
     resetControls() {
       if (this.feature === "crop") {
         this.selectedRatio = "35:45";
@@ -676,7 +691,12 @@ export default {
           "x",
           this.resizeHeight
         );
-      } else if (this.feature === "background-remove") {
+      } else if (this.feature === "clothes") {
+      changes = {
+        type: "clothes",
+        clothingType: this.selectedClothingType,
+      }}
+      else if (this.feature === "background-remove") {
         changes = {
           type: "background-remove",
           method: this.removalMethod,
@@ -1462,5 +1482,10 @@ export default {
 
 .primary:hover {
   background-color: #0069d9;
+}
+
+.template-option.active {
+  border: 2px solid #4a90e2;
+  background-color: rgba(74, 144, 226, 0.2);
 }
 </style>
