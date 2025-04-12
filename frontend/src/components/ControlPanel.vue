@@ -77,26 +77,29 @@
         <div class="control-item">
           <label>Current Dimensions:</label>
           <div class="size-display" v-if="imageDimensions">
-            {{ imageDimensions.width }}px × {{ imageDimensions.height }}px
+            {{ Math.round(imageDimensions.width * 0.264583) }}mm ×
+            {{ Math.round(imageDimensions.height * 0.264583) }}mm
           </div>
         </div>
         <div class="control-item">
-          <label>New Dimensions (px):</label>
+          <label>New Dimensions (mm):</label>
           <div class="size-inputs">
             <input
               type="number"
-              v-model.number="resizeWidth"
-              @change="calculateHeightFromWidth"
+              v-model.number="resizeWidthMm"
+              @change="calculateHeightFromWidthMm"
               class="size-input"
               min="1"
+              step="1"
             />
             ×
             <input
               type="number"
-              v-model.number="resizeHeight"
-              @change="calculateWidthFromHeight"
+              v-model.number="resizeHeightMm"
+              @change="calculateWidthFromHeightMm"
               class="size-input"
               min="1"
+              step="1"
             />
           </div>
           <div class="aspect-ratio-info">
@@ -196,39 +199,39 @@
 
       <!-- Clothes replacement controls -->
       <div v-if="feature === 'clothes'" class="control-group">
-      <div class="control-item">
-        <label>Select Clothing Template</label>
-        <div class="template-options">
-          <div 
-            class="template-option" 
-            :class="{ active: selectedClothingType === 'formal' }"
-            @click="setClothingType('formal')"
-          >
-            <span>Formal Suit</span>
-          </div>
-          <div 
-            class="template-option" 
-            :class="{ active: selectedClothingType === 'business' }"
-            @click="setClothingType('business')"
-          >
-            <span>Business Casual</span>
-          </div>
-          <div 
-            class="template-option" 
-            :class="{ active: selectedClothingType === 'dress' }"
-            @click="setClothingType('dress')"
-          >
-            <span>Formal Dress</span>
+        <div class="control-item">
+          <label>Select Clothing Template</label>
+          <div class="template-options">
+            <div
+              class="template-option"
+              :class="{ active: selectedClothingType === 'formal' }"
+              @click="setClothingType('formal')"
+            >
+              <span>Formal Suit</span>
+            </div>
+            <div
+              class="template-option"
+              :class="{ active: selectedClothingType === 'business' }"
+              @click="setClothingType('business')"
+            >
+              <span>Business Casual</span>
+            </div>
+            <div
+              class="template-option"
+              :class="{ active: selectedClothingType === 'dress' }"
+              @click="setClothingType('dress')"
+            >
+              <span>Formal Dress</span>
+            </div>
           </div>
         </div>
+        <div class="control-actions">
+          <button class="action-btn" @click="applyChanges">Apply</button>
+          <button class="action-btn secondary" @click="resetControls">
+            Reset
+          </button>
+        </div>
       </div>
-      <div class="control-actions">
-        <button class="action-btn" @click="applyChanges">Apply</button>
-        <button class="action-btn secondary" @click="resetControls">
-          Reset
-        </button>
-      </div>
-    </div>
 
       <!-- Face centering controls -->
       <div v-if="feature === 'face'" class="control-group">
@@ -459,6 +462,8 @@ export default {
       // Resize state
       resizeWidth: 0,
       resizeHeight: 0,
+      resizeWidthMm: 0,
+      resizeHeightMm: 0,
       originalAspectRatio: 1,
 
       // Background removal state
@@ -524,6 +529,8 @@ export default {
         if (val) {
           this.resizeWidth = val.width;
           this.resizeHeight = val.height;
+          this.resizeWidthMm = Math.round(val.width * 0.264583);
+          this.resizeHeightMm = Math.round(val.height * 0.264583);
           this.originalAspectRatio = val.width / val.height;
         }
       },
@@ -569,7 +576,10 @@ export default {
       this.$emit("update:cropWidth", this.localCropWidth);
       this.$emit("update:cropHeight", this.localCropHeight);
 
-      this.$emit("apply-dimensions", { width: this.localCropWidth, height: this.localCropHeight });
+      this.$emit("apply-dimensions", {
+        width: this.localCropWidth,
+        height: this.localCropHeight,
+      });
     },
     getFeatureTitle(feature) {
       const titles = {
@@ -623,7 +633,7 @@ export default {
       });
     },
     setClothingType(type) {
-    this.selectedClothingType = type;
+      this.selectedClothingType = type;
     },
     resetControls() {
       if (this.feature === "crop") {
@@ -696,11 +706,11 @@ export default {
           this.resizeHeight
         );
       } else if (this.feature === "clothes") {
-      changes = {
-        type: "clothes",
-        clothingType: this.selectedClothingType,
-      }}
-      else if (this.feature === "background-remove") {
+        changes = {
+          type: "clothes",
+          clothingType: this.selectedClothingType,
+        };
+      } else if (this.feature === "background-remove") {
         changes = {
           type: "background-remove",
           method: this.removalMethod,
@@ -808,19 +818,25 @@ export default {
       this.localCropHeight = parseFloat(value.toFixed(1)); // Keep one decimal place
       this.$emit("update:cropHeight", this.localCropHeight);
     },
-    calculateHeightFromWidth() {
-      if (this.originalAspectRatio && this.resizeWidth > 0) {
-        this.resizeHeight = Math.round(
-          this.resizeWidth / this.originalAspectRatio
+    calculateHeightFromWidthMm() {
+      if (this.originalAspectRatio && this.resizeWidthMm > 0) {
+        this.resizeHeightMm = Math.round(
+          this.resizeWidthMm / this.originalAspectRatio
         );
+        // Convert back to pixels for the actual resize operation
+        this.resizeWidth = Math.round(this.resizeWidthMm / 0.264583);
+        this.resizeHeight = Math.round(this.resizeHeightMm / 0.264583);
       }
     },
 
-    calculateWidthFromHeight() {
-      if (this.originalAspectRatio && this.resizeHeight > 0) {
-        this.resizeWidth = Math.round(
-          this.resizeHeight * this.originalAspectRatio
+    calculateWidthFromHeightMm() {
+      if (this.originalAspectRatio && this.resizeHeightMm > 0) {
+        this.resizeWidthMm = Math.round(
+          this.resizeHeightMm * this.originalAspectRatio
         );
+        // Convert back to pixels for the actual resize operation
+        this.resizeWidth = Math.round(this.resizeWidthMm / 0.264583);
+        this.resizeHeight = Math.round(this.resizeHeightMm / 0.264583);
       }
     },
 
@@ -828,6 +844,10 @@ export default {
       if (this.imageDimensions) {
         this.resizeWidth = this.imageDimensions.width;
         this.resizeHeight = this.imageDimensions.height;
+        this.resizeWidthMm = Math.round(this.imageDimensions.width * 0.264583);
+        this.resizeHeightMm = Math.round(
+          this.imageDimensions.height * 0.264583
+        );
       }
     },
     async uploadBackgroundImage(event) {
