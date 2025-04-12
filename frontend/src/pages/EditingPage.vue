@@ -69,6 +69,7 @@
         @faceDetectionChange="handleFaceDetectionChange"
         @upload-background-image="handleBackgroundImageUpload"
         @enhancement-preview="handleEnhancementPreview"
+        @reset-resize-mask="resetResizeMask"
         @close="closeControlPanel"
       />
     </div>
@@ -1153,6 +1154,12 @@ export default {
     handleAuthRequired() {
       console.log("Authentication required for Google Drive");
       this.showNotification("Please log in to Google Drive first by using the 'Import from Google Drive' button", "warning");
+    },
+
+    resetResizeMask() {
+      if (this.$refs.imageComponent) {
+        this.$refs.imageComponent.resetResizeBox();
+      }
     },
   },
   mounted() {

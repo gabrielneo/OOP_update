@@ -490,7 +490,7 @@ export default {
       originalWithBorderHeight: 0,
 
       // clothes
-      selectedClothingType: "male",
+      selectedClothingType: "formal",
     };
   },
   watch: {
@@ -637,17 +637,20 @@ export default {
         this.useProfileDetector = false;
         this.detectMultipleFaces = false;
       } else if (this.feature === "enhance") {
-        this.previewBrightness = 0;
-        this.previewContrast = 0;
-        this.brightness = 0;
-        this.contrast = 0;
-        this.enhancementActive = false;
-        this.isFirstAdjustment = true;
+        // Only reset the values that have been changed
+        if (this.previewBrightness !== 0) {
+          this.previewBrightness = 0;
+          this.brightness = 0;
+        }
+        if (this.previewContrast !== 0) {
+          this.previewContrast = 0;
+          this.contrast = 0;
+        }
 
         // When resetting, send a reset request to clear any enhancements
         this.$emit("enhancement-preview", {
-          brightness: 0,
-          contrast: 0,
+          brightness: this.previewBrightness,
+          contrast: this.previewContrast,
           firstAdjustment: true,
           previewInProgress: false,
         });
@@ -831,6 +834,9 @@ export default {
         this.resizeHeightMm = Math.round(
           this.imageDimensions.height * 0.264583
         );
+        
+        // Emit a custom event to reset the resize mask in the image component
+        this.$emit("reset-resize-mask");
       }
     },
     async uploadBackgroundImage(event) {
