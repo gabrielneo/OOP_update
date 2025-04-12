@@ -1,6 +1,8 @@
 package com.example.model;
 
 import java.awt.image.BufferedImage;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Stack;
 
 public class ImageState {
@@ -10,6 +12,7 @@ public class ImageState {
     private BufferedImage referenceImage; // Image before enhancement adjustments
     private final Stack<BufferedImage> history = new Stack<>();
     private final Stack<BufferedImage> future = new Stack<>();
+    private final Map<String, Object> metadata = new HashMap<>();
 
     public BufferedImage getCurrentImage() {
         return currentImage;
@@ -76,6 +79,27 @@ public class ImageState {
 
     public void clearFuture() {
         future.clear();
+    }
+    
+    // Metadata handling
+    public Map<String, Object> getMetadata() {
+        return metadata;
+    }
+    
+    public void setMetadata(String key, Object value) {
+        metadata.put(key, value);
+    }
+    
+    public Object getMetadata(String key) {
+        return metadata.get(key);
+    }
+    
+    public boolean hasMetadata(String key) {
+        return metadata.containsKey(key);
+    }
+    
+    public void clearMetadata() {
+        metadata.clear();
     }
 
     public BufferedImage cloneImage(BufferedImage img) {
