@@ -199,34 +199,39 @@
 
       <!-- Clothes replacement controls -->
       <div v-if="feature === 'clothes'" class="control-group">
-      <div class="control-item">
-        <label>Select Clothing Template</label>
-        <div class="template-options">
-          <div 
-            class="template-option" 
-            :class="{ active: selectedClothingType === 'male' }"
-            @click="setClothingType('male')"
-          >
-            <span>Formal Suit</span>
-            <span>(Male)</span>
-          </div>
-          <div 
-            class="template-option" 
-            :class="{ active: selectedClothingType === 'female' }"
-            @click="setClothingType('female')"
-          >
-          <span>Formal Suit</span>
-          <span>(Female)</span>
+        <div class="control-item">
+          <label>Select Clothing Template</label>
+          <div class="template-options">
+            <div
+              class="template-option"
+              :class="{ active: selectedClothingType === 'formal' }"
+              @click="setClothingType('formal')"
+            >
+              <span>Formal Suit</span>
+            </div>
+            <div
+              class="template-option"
+              :class="{ active: selectedClothingType === 'business' }"
+              @click="setClothingType('business')"
+            >
+              <span>Business Casual</span>
+            </div>
+            <div
+              class="template-option"
+              :class="{ active: selectedClothingType === 'dress' }"
+              @click="setClothingType('dress')"
+            >
+              <span>Formal Dress</span>
+            </div>
           </div>
         </div>
+        <div class="control-actions">
+          <button class="action-btn" @click="applyChanges">Apply</button>
+          <button class="action-btn secondary" @click="resetControls">
+            Reset
+          </button>
+        </div>
       </div>
-      <div class="control-actions">
-        <button class="action-btn" @click="applyChanges">Apply</button>
-        <button class="action-btn secondary" @click="resetControls">
-          Reset
-        </button>
-      </div>
-    </div>
 
       <!-- Face centering controls -->
       <div v-if="feature === 'face'" class="control-group">
@@ -502,7 +507,7 @@ export default {
       originalWithBorderHeight: 0,
 
       // clothes
-      selectedClothingType: "male",
+      selectedClothingType: "formal",
     };
   },
   watch: {
@@ -649,17 +654,20 @@ export default {
         this.useProfileDetector = false;
         this.detectMultipleFaces = false;
       } else if (this.feature === "enhance") {
-        this.previewBrightness = 0;
-        this.previewContrast = 0;
-        this.brightness = 0;
-        this.contrast = 0;
-        this.enhancementActive = false;
-        this.isFirstAdjustment = true;
+        // Only reset the values that have been changed
+        if (this.previewBrightness !== 0) {
+          this.previewBrightness = 0;
+          this.brightness = 0;
+        }
+        if (this.previewContrast !== 0) {
+          this.previewContrast = 0;
+          this.contrast = 0;
+        }
 
         // When resetting, send a reset request to clear any enhancements
         this.$emit("enhancement-preview", {
-          brightness: 0,
-          contrast: 0,
+          brightness: this.previewBrightness,
+          contrast: this.previewContrast,
           firstAdjustment: true,
           previewInProgress: false,
         });
@@ -843,6 +851,9 @@ export default {
         this.resizeHeightMm = Math.round(
           this.imageDimensions.height * 0.264583
         );
+        
+        // Emit a custom event to reset the resize mask in the image component
+        this.$emit("reset-resize-mask");
       }
     },
     async uploadBackgroundImage(event) {
