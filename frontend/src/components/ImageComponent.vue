@@ -77,6 +77,8 @@
 </template>
 
 <script>
+import { mmToPx, pxToMm, getConversionFactors } from '../utils/dpiUtils';
+
 export default {
   props: {
     image: {
@@ -90,10 +92,12 @@ export default {
     cropWidthMm: {
       type: Number,
       default: 35,
+      validator: (value) => value >= 0.1
     },
     cropHeightMm: {
       type: Number,
       default: 45,
+      validator: (value) => value >= 0.1
     },
     imageDimensions: {
       type: Object,
@@ -113,6 +117,11 @@ export default {
       // Add image load event to ensure resize box updates after image loads
       if (this.$refs.photoImage) {
         this.$refs.photoImage.addEventListener("load", this.handleImageLoad);
+        
+        // If image is already loaded, emit the dimensions immediately
+        if (this.$refs.photoImage.complete) {
+          this.handleImageLoad();
+        }
       }
     });
   },
@@ -170,10 +179,27 @@ export default {
       };
     },
     dimensionCropBoxStyle() {
-      // Convert millimeters to pixels (approximate conversion)
-      const pxPerMm = 3.78;
-      const widthPx = Math.max(1, this.cropWidthMm) * pxPerMm;
-      const heightPx = Math.max(1, this.cropHeightMm) * pxPerMm;
+      // Use the dynamic conversion factor instead of hardcoded value
+      const { pxPerMm } = getConversionFactors();
+      
+      // Get the image element
+      const photoImage = this.$refs.photoImage;
+      if (!photoImage) return {};
+      
+      // Get the actual image dimensions on screen
+      const imgRect = photoImage.getBoundingClientRect();
+      
+      // Get the natural dimensions
+      const naturalWidth = photoImage.naturalWidth;
+      const naturalHeight = photoImage.naturalHeight;
+      
+      // Calculate scaling factor between natural and display size
+      const scaleFactorX = imgRect.width / naturalWidth;
+      const scaleFactorY = imgRect.height / naturalHeight;
+      
+      // Apply this scaling factor to our mm-to-px conversion
+      const widthPx = Math.max(1, this.cropWidthMm) * pxPerMm * scaleFactorX;
+      const heightPx = Math.max(1, this.cropHeightMm) * pxPerMm * scaleFactorY;
 
       // Force a reactivity dependency on the dimensions
       this.cropWidthMm; // eslint-disable-line no-unused-expressions
@@ -275,12 +301,22 @@ export default {
 
       // Get the actual image dimensions
       const imgRect = photoImage.getBoundingClientRect();
+      
+      // Get the natural dimensions
+      const naturalWidth = photoImage.naturalWidth;
+      const naturalHeight = photoImage.naturalHeight;
+      
+      // Calculate scaling factor between natural and display size
+      const scaleFactorX = imgRect.width / naturalWidth;
+      const scaleFactorY = imgRect.height / naturalHeight;
 
-      const pxPerMm = 3.78;
+      // Use the dynamic conversion factor from dpiUtils
+      const { pxPerMm } = getConversionFactors();
 
-      // Ensure valid dimensions
-      const widthPx = Math.max(1, this.cropWidthMm) * pxPerMm;
-      const heightPx = Math.max(1, this.cropHeightMm) * pxPerMm;
+      // Calculate dimensions in pixels - applying both the mm-to-px conversion AND the image scaling
+      // Use parseFloat to handle decimal values in crop dimensions
+      const widthPx = Math.max(0.1, parseFloat(this.cropWidthMm)) * pxPerMm * scaleFactorX;
+      const heightPx = Math.max(0.1, parseFloat(this.cropHeightMm)) * pxPerMm * scaleFactorY;
 
       // Center the crop box within the actual image bounds
       this.movableCropBox.x = Math.max(0, (imgRect.width - widthPx) / 2);
@@ -295,7 +331,7 @@ export default {
       });
 
       console.log(
-        `Crop box centered at (${this.movableCropBox.x}, ${this.movableCropBox.y}) with dimensions: ${this.cropWidthMm}x${this.cropHeightMm}mm`
+        `Crop box centered at (${this.movableCropBox.x}, ${this.movableCropBox.y}) with dimensions: ${this.cropWidthMm}x${this.cropHeightMm}mm (${widthPx}x${heightPx}px on screen)`
       );
     },
     startMoveCropBox(event) {
@@ -316,9 +352,22 @@ export default {
       // Get the actual image bounds
       const img = this.$refs.photoImage;
       const imgRect = img.getBoundingClientRect();
-      const pxPerMm = 3.78;
-      const widthPx = Math.max(1, this.cropWidthMm) * pxPerMm;
-      const heightPx = Math.max(1, this.cropHeightMm) * pxPerMm;
+      
+      // Get the natural dimensions
+      const naturalWidth = img.naturalWidth;
+      const naturalHeight = img.naturalHeight;
+      
+      // Calculate scaling factor between natural and display size
+      const scaleFactorX = imgRect.width / naturalWidth;
+      const scaleFactorY = imgRect.height / naturalHeight;
+      
+      // Use the dynamic conversion factor from dpiUtils
+      const { pxPerMm } = getConversionFactors();
+      
+      // Apply both the mm-to-px conversion AND the image scaling
+      // Use parseFloat to handle decimal values in crop dimensions
+      const widthPx = Math.max(0.1, parseFloat(this.cropWidthMm)) * pxPerMm * scaleFactorX;
+      const heightPx = Math.max(0.1, parseFloat(this.cropHeightMm)) * pxPerMm * scaleFactorY;
 
       // Calculate new position
       let newX = event.clientX - this.movableCropBox.startX;
@@ -363,10 +412,17 @@ export default {
       const ratioX = imgNaturalWidth / displayWidth;
       const ratioY = imgNaturalHeight / displayHeight;
 
-      // Convert mm to pixels for display
-      const pxPerMm = 3.78;
-      const displayWidthPx = Math.max(1, this.cropWidthMm) * pxPerMm;
-      const displayHeightPx = Math.max(1, this.cropHeightMm) * pxPerMm;
+      // Calculate scaling factor between natural and display size
+      const scaleFactorX = displayWidth / imgNaturalWidth;
+      const scaleFactorY = displayHeight / imgNaturalHeight;
+      
+      // Use the dynamic conversion factor from dpiUtils
+      const { pxPerMm } = getConversionFactors();
+      
+      // Convert mm to pixels for display, applying BOTH the mm-to-px conversion AND the image scaling
+      // Use parseFloat to handle decimal values in crop dimensions
+      const displayWidthPx = Math.max(0.1, parseFloat(this.cropWidthMm)) * pxPerMm * scaleFactorX;
+      const displayHeightPx = Math.max(0.1, parseFloat(this.cropHeightMm)) * pxPerMm * scaleFactorY;
 
       // Calculate crop coordinates in the display
       const displayX = this.movableCropBox.x;
@@ -375,17 +431,19 @@ export default {
       // Convert to coordinates in the natural image
       const cropNaturalX = Math.floor(displayX * ratioX);
       const cropNaturalY = Math.floor(displayY * ratioY);
+      
+      // Convert display dimensions to natural dimensions
       const cropNaturalWidth = Math.max(1, Math.floor(displayWidthPx * ratioX));
-      const cropNaturalHeight = Math.max(
-        1,
-        Math.floor(displayHeightPx * ratioY)
-      );
+      const cropNaturalHeight = Math.max(1, Math.floor(displayHeightPx * ratioY));
 
       console.log(
         `Emitting crop area: x=${cropNaturalX}, y=${cropNaturalY}, width=${cropNaturalWidth}, height=${cropNaturalHeight}`
       );
       console.log(
         `Original image dimensions: ${imgNaturalWidth}x${imgNaturalHeight}, Display: ${displayWidth}x${displayHeight}`
+      );
+      console.log(
+        `Display dimensions of crop: ${displayWidthPx}x${displayHeightPx} at position (${displayX},${displayY})`
       );
 
       this.$emit("crop-area", {
@@ -1141,6 +1199,18 @@ export default {
     // Add image load handler
     handleImageLoad() {
       console.log("Image loaded, checking if resize box needs update");
+      
+      // Get the image dimensions and emit them
+      const img = this.$refs.photoImage;
+      if (img) {
+        const dimensions = {
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        };
+        console.log("Emitting image dimensions on load:", dimensions);
+        this.$emit("resize-dimensions", dimensions);
+      }
+      
       if (this.activeFeature === "resize") {
         this.resetResizeBox();
       }

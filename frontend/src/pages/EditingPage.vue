@@ -130,6 +130,17 @@ export default {
     setActiveFeature(feature) {
       this.activeFeature = feature;
       console.log(`Active feature set to: ${feature}`);
+      
+      // Always fetch image dimensions when any feature is selected
+      if (this.currentPhoto) {
+        this.fetchImageDimensions();
+      }
+      
+      // Special handling for crop feature
+      if (feature === "crop") {
+        console.log("Feature changed to crop: Setting default crop dimensions");
+        this.updateCropDimensions(35, 45);
+      }
     },
     closeControlPanel() {
       this.activeFeature = null;
@@ -251,19 +262,49 @@ export default {
           // Only update if dimensions are valid
           if (dimensions && dimensions.width > 0 && dimensions.height > 0) {
             this.imageDimensions = dimensions;
-            console.log("Image dimensions updated:", dimensions);
+            console.log("Image dimensions updated from server:", dimensions);
           } else {
             console.error("Invalid dimensions received:", dimensions);
+            this.getImageDimensionsFromDOM();
           }
         } else {
           console.error(
             "Failed to fetch image dimensions:",
             await response.text()
           );
+          this.getImageDimensionsFromDOM();
         }
       } catch (error) {
         console.error("Error fetching image dimensions:", error);
+        this.getImageDimensionsFromDOM();
       }
+    },
+    
+    // Get dimensions directly from the image element as a fallback
+    getImageDimensionsFromDOM() {
+      console.log("Getting image dimensions from DOM");
+      this.$nextTick(() => {
+        const imageComponent = this.$refs.imageComponent;
+        if (imageComponent && imageComponent.$refs.photoImage) {
+          const img = imageComponent.$refs.photoImage;
+          if (img.complete) {
+            this.imageDimensions = {
+              width: img.naturalWidth,
+              height: img.naturalHeight
+            };
+            console.log("Image dimensions from DOM:", this.imageDimensions);
+          } else {
+            // If image isn't loaded yet, wait for it
+            img.onload = () => {
+              this.imageDimensions = {
+                width: img.naturalWidth,
+                height: img.naturalHeight
+              };
+              console.log("Image dimensions from DOM onload:", this.imageDimensions);
+            };
+          }
+        }
+      });
     },
 
     async uploadNewImage(event) {
@@ -304,8 +345,9 @@ export default {
     // Handle explicit dimension updates
     handleApplyDimensions({ width, height }) {
       console.log(`Explicitly applying dimensions: ${width}x${height}`);
-      this.cropWidth = width;
-      this.cropHeight = height;
+      // Ensure values are parsed as floats to handle decimal places
+      this.cropWidth = parseFloat(width);
+      this.cropHeight = parseFloat(height);
 
       // Force the ImageComponent to update its crop box
       if (this.$refs.imageComponent) {
@@ -313,11 +355,11 @@ export default {
       }
     },
 
-    // Handle resize dimensions from dragging resize handles
+    // Handle resize dimensions from dragging resize handles or when the image loads
     handleResizeDimensions(dimensions) {
-      console.log("Received resize dimensions:", dimensions);
+      console.log("Received image dimensions:", dimensions);
 
-      // Only update the displayed dimensions in the control panel
+      // Always update the displayed dimensions in the header
       if (this.imageDimensions) {
         this.imageDimensions.width = dimensions.width;
         this.imageDimensions.height = dimensions.height;
@@ -347,9 +389,9 @@ export default {
           const scaleX = imgEl.naturalWidth / rect.width;
           const scaleY = imgEl.naturalHeight / rect.height;
 
-          // Ensure valid dimensions
-          const cropWidth = Math.max(1, this.cropWidth);
-          const cropHeight = Math.max(1, this.cropHeight);
+          // Ensure valid dimensions and handle decimal places
+          const cropWidth = Math.max(0.1, parseFloat(this.cropWidth));
+          const cropHeight = Math.max(0.1, parseFloat(this.cropHeight));
 
           const cropPxWidth = (cropWidth / 35) * 140;
           const cropPxHeight = (cropHeight / 45) * 180;
@@ -683,9 +725,14 @@ export default {
         if (response.ok) {
           await this.updateImageAfterEdit();
           console.log("Existing image loaded on component mount");
+        } else {
+          // Even if we don't have an image yet, try to get dimensions
+          await this.fetchImageDimensions();
         }
       } catch (error) {
         console.log("No existing image found or error fetching image:", error);
+        // Still try to fetch dimensions
+        await this.fetchImageDimensions();
       }
     },
 
@@ -1067,21 +1114,6 @@ export default {
       }
     },
     
-    // Method to fetch image dimensions from the server
-    async fetchImageDimensions() {
-      try {
-        const response = await fetch("http://localhost:8080/api/image/dimensions");
-        if (response.ok) {
-          const dimensions = await response.json();
-          this.imageWidth = dimensions.width;
-          this.imageHeight = dimensions.height;
-          console.log("Image dimensions fetched:", dimensions);
-        }
-      } catch (error) {
-        console.error("Error fetching image dimensions:", error);
-      }
-    },
-    
     // Method to update image dimensions from the current photo element
     updateImageDimensions() {
       this.$nextTick(() => {
@@ -1113,6 +1145,11 @@ export default {
   mounted() {
     // Check if an image is already available and fetch its dimensions
     this.checkForExistingImage();
+    
+    // Ensure we have image dimensions for display in header, even if using default image
+    if (!this.imageDimensions) {
+      this.fetchImageDimensions();
+    }
   },
 };
 </script>

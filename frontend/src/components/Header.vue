@@ -1,6 +1,6 @@
 <template>
   <div class="header">
-    <div class="left-menu">
+    <div class="left-section">
       <button class="header-btn" @click="$emit('new-project')" title="Create New (Ctrl+N)">
         <i-lucide-file-plus class="icon" />
         <span>New</span>
@@ -13,30 +13,11 @@
         <i-lucide-download class="icon" />
         <span>Export</span>
       </button>
+    </div>
+    
+    <div class="drive-section">
       <slot name="google-drive-button"></slot>
       <slot name="google-drive-export-button"></slot>
-    </div>
-
-    <!-- Export Dialog -->
-    <div v-if="showExportDialog" class="export-dialog">
-      <div class="export-dialog-content">
-        <h3>Export Image</h3>
-        <div class="form-group">
-          <label for="filename">Filename:</label>
-          <input 
-            type="text" 
-            id="filename" 
-            v-model="exportFilename" 
-            placeholder="Enter filename (without extension)"
-            @keyup.enter="confirmExport"
-            ref="filenameInput"
-          />
-        </div>
-        <div class="dialog-buttons">
-          <button class="btn cancel" @click="showExportDialog = false">Cancel</button>
-          <button class="btn export" @click="confirmExport">Export</button>
-        </div>
-      </div>
     </div>
 
     <div class="image-dimensions" v-if="imageDimensions">
@@ -71,9 +52,32 @@
         :disabled="!canReset"
         title="Reset to Original"
       >
-        <i-lucide-refresh-cw class="icon" />
+        <i-lucide-redo-2 class="icon" />
         <span>Reset</span>
       </button>
+        <span>‎ ‎ ‎ </span>
+    </div>
+
+    <!-- Export Dialog -->
+    <div v-if="showExportDialog" class="export-dialog">
+      <div class="export-dialog-content">
+        <h3>Export Image</h3>
+        <div class="form-group">
+          <label for="filename">Filename:</label>
+          <input 
+            type="text" 
+            id="filename" 
+            v-model="exportFilename" 
+            placeholder="Enter filename (without extension)"
+            @keyup.enter="confirmExport"
+            ref="filenameInput"
+          />
+        </div>
+        <div class="dialog-buttons">
+          <button class="btn cancel" @click="showExportDialog = false">Cancel</button>
+          <button class="btn export" @click="confirmExport">Export</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -168,31 +172,41 @@ export default {
 
 <style scoped>
 .header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  grid-template-areas: "left drive dimensions right";
+  gap: 16px;
   align-items: center;
-  justify-content: space-between;
   padding: 8px 16px;
   background-color: #252a2e;
   border-bottom: 1px solid #3a3f45;
   height: 50px;
   width: 100%;
+  overflow: visible;
 }
 
-.left-menu {
+.left-section {
   display: flex;
   gap: 8px;
+  grid-area: left;
+}
+
+.drive-section {
+  display: flex;
+  gap: 8px;
+  grid-area: drive;
 }
 
 .image-dimensions {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   padding: 5px 10px;
   background-color: #3a3f45;
   border-radius: 4px;
   font-size: 14px;
+  grid-area: dimensions;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .dimensions-label {
@@ -214,19 +228,23 @@ export default {
 .right-menu {
   display: flex;
   gap: 8px;
+  justify-self: end;
+  grid-area: right;
+  padding-right: 5px;
 }
 
 .header-btn {
   background: transparent;
   border: none;
   color: #ffffff;
-  padding: 6px 10px;
+  padding: 6px 8px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  white-space: nowrap;
 }
 
 .header-btn:hover {
@@ -251,9 +269,77 @@ export default {
   color: #5a5f65;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 1200px) {
+  .header {
+    gap: 10px;
+  }
+  
+  .dimensions-value:last-child {
+    display: none; /* Hide mm dimensions on medium screens */
+  }
+  
+  .dimensions-separator {
+    display: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  .header {
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas: 
+      "left drive dimensions right";
+    gap: 8px;
+    padding: 8px 10px;
+  }
+}
+
+@media (max-width: 900px) {
+  .image-dimensions {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+}
+
+@media (max-width: 800px) {
+  .header-btn {
+    padding: 6px 5px;
+  }
+  
+  .right-menu {
+    gap: 5px;
+  }
+  
+  .header {
+    gap: 5px;
+  }
+}
+
+@media (max-width: 750px) {
+  .header {
+    grid-template-columns: auto auto auto;
+    grid-template-areas: 
+      "left drive right"
+      "dimensions dimensions dimensions";
+    grid-template-rows: auto auto;
+    height: auto;
+    padding: 8px 10px 4px;
+  }
+  
+  .image-dimensions {
+    margin-top: 4px;
+    justify-self: center;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 650px) {
   .header-btn span {
     display: none;
+  }
+  
+  .image-dimensions {
+    max-width: none;
+    justify-self: center;
   }
 }
 
