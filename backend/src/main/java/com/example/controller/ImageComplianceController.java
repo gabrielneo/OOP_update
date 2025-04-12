@@ -25,13 +25,18 @@ public class ImageComplianceController {
 
     @PostMapping(value = "/check", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ImageComplianceResponse> checkImageCompliance(
-            @RequestParam("image") MultipartFile image) {
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(value = "hasReplacedBackground", required = false, defaultValue = "false") boolean hasReplacedBackground,
+            @RequestParam(value = "backgroundColor", required = false) String backgroundColor) {
         
         try {
-            logger.info("Received compliance check request for image: {}", image.getOriginalFilename());
+            logger.info("Received compliance check request for image: {}, hasReplacedBackground: {}, backgroundColor: {}", 
+                     image.getOriginalFilename(), hasReplacedBackground, backgroundColor);
             
             ImageComplianceRequest request = new ImageComplianceRequest();
             request.setImage(image);
+            request.setHasReplacedBackground(hasReplacedBackground);
+            request.setBackgroundColor(backgroundColor);
             
             return imageComplianceService.checkImageCompliance(request);
         } catch (Exception e) {

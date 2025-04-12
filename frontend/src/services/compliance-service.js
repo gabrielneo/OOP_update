@@ -7,9 +7,10 @@ class ComplianceService {
   /**
    * Check if the current image meets compliance standards
    * @param {File|Blob} imageBlob - The image blob to check
+   * @param {object} options - Additional options for the compliance check
    * @returns {Promise} Promise resolving to compliance check result
    */
-  async checkImageCompliance(imageBlob) {
+  async checkImageCompliance(imageBlob, options = {}) {
     try {
       // Validate input
       if (!imageBlob) {
@@ -24,107 +25,85 @@ class ComplianceService {
       console.log('Checking compliance with image blob:', {
         type: imageBlob.type,
         size: imageBlob.size,
-        lastModified: imageBlob.lastModified
+        lastModified: imageBlob.lastModified,
+        options
       });
       
       // Create form data to send the image
       const formData = new FormData();
       formData.append('image', imageBlob, 'image.jpg');
       
-      // Configure request with short timeout to fail fast if backend is not available
-      const requestConfig = {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        timeout: 30000,  // 30 second timeout
-      };
-      
-      // Try a HEAD request to check if the API is available before making the full request
-      try {
-        console.log('Testing API connection...');
-        // Try to connect to the API endpoint
-        await fetch('http://localhost:8080/api/ping', { 
-          method: 'HEAD',
-          mode: 'no-cors' // This is important to avoid CORS issues
-        });
-        console.log('API connection successful');
-      } catch (connectionError) {
-        console.error('API server appears to be unavailable:', connectionError);
-        return {
-          compliant: false,
-          issues: ['API server is unavailable. Make sure the backend server is running on port 8080.'],
-          message: 'Server connection failed'
-        };
+      // Add background replacement information if available
+      if (options.hasReplacedBackground) {
+        formData.append('hasReplacedBackground', 'true');
+        if (options.backgroundColor) {
+          formData.append('backgroundColor', options.backgroundColor);
+        }
       }
       
       console.log('Sending compliance check request to server...');
       
-      // Make API call to compliance service with a direct URL instead of using apiClient
-      const response = await fetch('http://localhost:8080/api/compliance/check', {
-        method: 'POST',
-        body: formData,
-        // No need to set Content-Type for FormData, browser will set it automatically with boundary
-        // This avoids issues with Content-Type header setting in cross-origin requests
-      });
-      
-      console.log('Received response from server:', response.status);
-      
-      // Check if the response is OK (status in the range 200-299)
-      if (!response.ok) {
-        console.error('Server returned error status:', response.status);
-        return {
-          compliant: false,
-          issues: [`Server error: ${response.status} ${response.statusText}`],
-          message: 'Compliance check failed'
-        };
-      }
-      
-      // Parse the JSON response
       try {
-        const data = await response.json();
-        console.log('Response data:', data);
+        // Make API call to compliance service with direct URL and credentials
+        const response = await fetch('http://localhost:8080/api/compliance/check', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include', // Include cookies if needed for session
+          mode: 'cors', // Explicitly enable CORS
+          // Don't set Content-Type for FormData - browser sets it automatically with boundary
+        });
         
-        // Check if response has expected structure
-        if (data && typeof data === 'object') {
-          return data;
-        } else {
-          console.error('Unexpected response format:', data);
+        console.log('Received response from server:', response.status);
+        
+        // Check if the response is OK (status in the range 200-299)
+        if (!response.ok) {
+          console.error('Server returned error status:', response.status);
           return {
             compliant: false,
-            issues: ['Server returned an unexpected response format'],
+            issues: [`Server error: ${response.status} ${response.statusText}`],
+            message: 'Compliance check failed'
+          };
+        }
+        
+        // Parse the JSON response
+        try {
+          const data = await response.json();
+          console.log('Response data:', data);
+          
+          // Check if response has expected structure
+          if (data && typeof data === 'object') {
+            return data;
+          } else {
+            console.error('Unexpected response format:', data);
+            return {
+              compliant: false,
+              issues: ['Server returned an unexpected response format'],
+              message: 'Compliance check error'
+            };
+          }
+        } catch (parseError) {
+          console.error('Error parsing server response:', parseError);
+          return {
+            compliant: false,
+            issues: ['Could not parse server response'],
             message: 'Compliance check error'
           };
         }
-      } catch (parseError) {
-        console.error('Error parsing server response:', parseError);
+      } catch (fetchError) {
+        console.error('Network error during compliance check:', fetchError);
         return {
           compliant: false,
-          issues: ['Could not parse server response'],
-          message: 'Compliance check error'
+          issues: ['Cannot connect to the server. Make sure your backend is running at http://localhost:8080'],
+          message: 'Server connection failed'
         };
       }
     } catch (error) {
       console.error('Compliance check failed:', error);
       
-      // Provide descriptive error messages based on error type
-      let errorMessage = 'Could not check image compliance';
-      
-      if (error.response) {
-        // Server responded with an error status
-        errorMessage = `Server error: ${error.response.status} - ${error.response.statusText}`;
-        console.error('Error response data:', error.response.data);
-      } else if (error.request) {
-        // Request was made but no response received
-        errorMessage = 'Server did not respond to compliance check request';
-      } else {
-        // Error setting up the request
-        errorMessage = `Request error: ${error.message}`;
-      }
-      
       // Provide structured error even if API fails
       return {
         compliant: false,
-        issues: [errorMessage],
+        issues: [`Request error: ${error.message || 'Unknown error'}`],
         message: 'Compliance check failed'
       };
     }

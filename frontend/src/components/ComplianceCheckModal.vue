@@ -73,22 +73,23 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 9999;
 }
 
 .compliance-modal-content {
   background-color: white;
   border-radius: 8px;
   width: 90%;
-  max-width: 500px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  max-width: 600px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   max-height: 80vh;
+  border: 2px solid #e74c3c;
 }
 
 .compliance-modal-header {
@@ -211,27 +212,30 @@ export default {
 }
 
 .issues-list li {
-  margin-bottom: 8px;
-  font-size: 14px;
+  margin-bottom: 12px;
+  font-size: 15px;
   color: #e74c3c;
   background-color: rgba(231, 76, 60, 0.1);
   border: 1px solid rgba(231, 76, 60, 0.3);
-  padding: 8px 12px;
+  padding: 12px 16px;
   border-radius: 4px;
   list-style-position: inside;
+  font-weight: 500;
 }
 
 .action-btn {
-  background-color: #3498db;
+  background-color: #e74c3c;
   color: white;
   border: none;
-  padding: 8px 16px;
+  padding: 10px 20px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
 }
 
 .action-btn:hover {
-  background-color: #2980b9;
+  background-color: #c0392b;
 }
 </style> 

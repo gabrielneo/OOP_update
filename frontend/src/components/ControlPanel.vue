@@ -77,26 +77,29 @@
         <div class="control-item">
           <label>Current Dimensions:</label>
           <div class="size-display" v-if="imageDimensions">
-            {{ imageDimensions.width }}px × {{ imageDimensions.height }}px
+            {{ Math.round(imageDimensions.width * 0.264583) }}mm ×
+            {{ Math.round(imageDimensions.height * 0.264583) }}mm
           </div>
         </div>
         <div class="control-item">
-          <label>New Dimensions (px):</label>
+          <label>New Dimensions (mm):</label>
           <div class="size-inputs">
             <input
               type="number"
-              v-model.number="resizeWidth"
-              @change="calculateHeightFromWidth"
+              v-model.number="resizeWidthMm"
+              @change="calculateHeightFromWidthMm"
               class="size-input"
               min="1"
+              step="1"
             />
             ×
             <input
               type="number"
-              v-model.number="resizeHeight"
-              @change="calculateWidthFromHeight"
+              v-model.number="resizeHeightMm"
+              @change="calculateWidthFromHeightMm"
               class="size-input"
               min="1"
+              step="1"
             />
           </div>
           <div class="aspect-ratio-info">
@@ -130,21 +133,18 @@
               :class="['control-btn', { active: removalMethod === 'auto' }]"
               @click="setRemovalMethod('auto')"
             >
-              Automatic
+              Automatic Mode (selected)
             </button>
-            <button
+            <!-- <button
               :class="['control-btn', { active: removalMethod === 'manual' }]"
               @click="setRemovalMethod('manual')"
             >
               Manual Selection
-            </button>
+            </button> -->
           </div>
         </div>
         <div class="control-actions">
           <button class="action-btn" @click="applyChanges">Apply</button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
         </div>
       </div>
 
@@ -188,9 +188,6 @@
         </div>
         <div class="control-actions">
           <button class="action-btn" @click="applyChanges">Apply</button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
         </div>
       </div>
 
@@ -201,32 +198,24 @@
         <div class="template-options">
           <div 
             class="template-option" 
-            :class="{ active: selectedClothingType === 'formal' }"
-            @click="setClothingType('formal')"
+            :class="{ active: selectedClothingType === 'male' }"
+            @click="setClothingType('male')"
           >
             <span>Formal Suit</span>
+            <span>(Male)</span>
           </div>
           <div 
             class="template-option" 
-            :class="{ active: selectedClothingType === 'business' }"
-            @click="setClothingType('business')"
+            :class="{ active: selectedClothingType === 'female' }"
+            @click="setClothingType('female')"
           >
-            <span>Business Casual</span>
-          </div>
-          <div 
-            class="template-option" 
-            :class="{ active: selectedClothingType === 'dress' }"
-            @click="setClothingType('dress')"
-          >
-            <span>Formal Dress</span>
+          <span>Formal Suit</span>
+          <span>(Female)</span>
           </div>
         </div>
       </div>
       <div class="control-actions">
         <button class="action-btn" @click="applyChanges">Apply</button>
-        <button class="action-btn secondary" @click="resetControls">
-          Reset
-        </button>
       </div>
     </div>
 
@@ -374,9 +363,6 @@
           >
             Apply
           </button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
         </div>
       </div>
 
@@ -414,6 +400,18 @@
           <button class="action-btn" @click="applyChanges">Apply</button>
           <button class="action-btn secondary" @click="resetControls">
             Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Compliance Check controls -->
+      <div v-if="feature === 'compliance-check'" class="control-group">
+        <div class="control-item">
+          <h3>Photo Compliance Check</h3>
+          <p class="helper-text">Check if your photo meets the standard ID photo requirements.</p>
+          
+          <button class="action-btn primary" @click="checkCompliance" style="margin-top: 20px;">
+            Check Compliance Now
           </button>
         </div>
       </div>
@@ -473,6 +471,8 @@ export default {
       // Resize state
       resizeWidth: 0,
       resizeHeight: 0,
+      resizeWidthMm: 0,
+      resizeHeightMm: 0,
       originalAspectRatio: 1,
 
       // Background removal state
@@ -524,7 +524,7 @@ export default {
         result: {
           compliant: false,
           issues: [],
-          message: 'Compliance check not performed yet'
+          message: 'Checking compliance...'
         }
       },
     };
@@ -551,6 +551,8 @@ export default {
         if (val) {
           this.resizeWidth = val.width;
           this.resizeHeight = val.height;
+          this.resizeWidthMm = Math.round(val.width * 0.264583);
+          this.resizeHeightMm = Math.round(val.height * 0.264583);
           this.originalAspectRatio = val.width / val.height;
         }
       },
@@ -596,7 +598,10 @@ export default {
       this.$emit("update:cropWidth", this.localCropWidth);
       this.$emit("update:cropHeight", this.localCropHeight);
 
-      this.$emit("apply-dimensions", { width: this.localCropWidth, height: this.localCropHeight });
+      this.$emit("apply-dimensions", {
+        width: this.localCropWidth,
+        height: this.localCropHeight,
+      });
     },
     getFeatureTitle(feature) {
       const titles = {
@@ -608,6 +613,7 @@ export default {
         face: "Face Centering",
         enhance: "Enhance",
         layout: "Layout",
+        "compliance-check": "Compliance Check"
       };
       return titles[feature] || "Edit Photo";
     },
@@ -650,7 +656,7 @@ export default {
       });
     },
     setClothingType(type) {
-    this.selectedClothingType = type;
+      this.selectedClothingType = type;
     },
     resetControls() {
       if (this.feature === "crop") {
@@ -671,17 +677,20 @@ export default {
         this.useProfileDetector = false;
         this.detectMultipleFaces = false;
       } else if (this.feature === "enhance") {
-        this.previewBrightness = 0;
-        this.previewContrast = 0;
-        this.brightness = 0;
-        this.contrast = 0;
-        this.enhancementActive = false;
-        this.isFirstAdjustment = true;
+        // Only reset the values that have been changed
+        if (this.previewBrightness !== 0) {
+          this.previewBrightness = 0;
+          this.brightness = 0;
+        }
+        if (this.previewContrast !== 0) {
+          this.previewContrast = 0;
+          this.contrast = 0;
+        }
 
         // When resetting, send a reset request to clear any enhancements
         this.$emit("enhancement-preview", {
-          brightness: 0,
-          contrast: 0,
+          brightness: this.previewBrightness,
+          contrast: this.previewContrast,
           firstAdjustment: true,
           previewInProgress: false,
         });
@@ -723,11 +732,11 @@ export default {
           this.resizeHeight
         );
       } else if (this.feature === "clothes") {
-      changes = {
-        type: "clothes",
-        clothingType: this.selectedClothingType,
-      }}
-      else if (this.feature === "background-remove") {
+        changes = {
+          type: "clothes",
+          clothingType: this.selectedClothingType,
+        };
+      } else if (this.feature === "background-remove") {
         changes = {
           type: "background-remove",
           method: this.removalMethod,
@@ -835,19 +844,25 @@ export default {
       this.localCropHeight = parseFloat(value.toFixed(1)); // Keep one decimal place
       this.$emit("update:cropHeight", this.localCropHeight);
     },
-    calculateHeightFromWidth() {
-      if (this.originalAspectRatio && this.resizeWidth > 0) {
-        this.resizeHeight = Math.round(
-          this.resizeWidth / this.originalAspectRatio
+    calculateHeightFromWidthMm() {
+      if (this.originalAspectRatio && this.resizeWidthMm > 0) {
+        this.resizeHeightMm = Math.round(
+          this.resizeWidthMm / this.originalAspectRatio
         );
+        // Convert back to pixels for the actual resize operation
+        this.resizeWidth = Math.round(this.resizeWidthMm / 0.264583);
+        this.resizeHeight = Math.round(this.resizeHeightMm / 0.264583);
       }
     },
 
-    calculateWidthFromHeight() {
-      if (this.originalAspectRatio && this.resizeHeight > 0) {
-        this.resizeWidth = Math.round(
-          this.resizeHeight * this.originalAspectRatio
+    calculateWidthFromHeightMm() {
+      if (this.originalAspectRatio && this.resizeHeightMm > 0) {
+        this.resizeWidthMm = Math.round(
+          this.resizeHeightMm * this.originalAspectRatio
         );
+        // Convert back to pixels for the actual resize operation
+        this.resizeWidth = Math.round(this.resizeWidthMm / 0.264583);
+        this.resizeHeight = Math.round(this.resizeHeightMm / 0.264583);
       }
     },
 
@@ -855,6 +870,13 @@ export default {
       if (this.imageDimensions) {
         this.resizeWidth = this.imageDimensions.width;
         this.resizeHeight = this.imageDimensions.height;
+        this.resizeWidthMm = Math.round(this.imageDimensions.width * 0.264583);
+        this.resizeHeightMm = Math.round(
+          this.imageDimensions.height * 0.264583
+        );
+        
+        // Emit a custom event to reset the resize mask in the image component
+        this.$emit("reset-resize-mask");
       }
     },
     async uploadBackgroundImage(event) {
@@ -1045,30 +1067,20 @@ export default {
       await this.calculateLayoutDimensions();
     },
     async checkCompliance() {
+      console.log("Starting compliance check");
       this.complianceCheck.isModalVisible = true;
       this.complianceCheck.loading = true;
+      this.complianceCheck.result = {
+        compliant: false,
+        issues: [],
+        message: 'Checking compliance...'
+      };
       
       try {
-        // First test the backend connection
-        const isBackendAvailable = await ComplianceService.testBackendConnection();
-        
-        if (!isBackendAvailable) {
-          this.complianceCheck.result = {
-            compliant: false,
-            issues: [
-              'Cannot connect to the backend server.',
-              'Make sure the Spring Boot backend is running on port 8080.',
-              'Try starting the server with: cd backend && mvn spring-boot:run'
-            ],
-            message: 'Backend server not available'
-          };
-          this.complianceCheck.loading = false;
-          return;
-        }
-        
         // Check if image is available
         if (!this.image) {
           // If no image prop, emit an event to request the current image
+          console.log("No image available, requesting from parent component");
           this.$emit('request-image-for-compliance');
           
           // Add a delay to allow the parent component to provide the image
@@ -1076,6 +1088,7 @@ export default {
           
           // If still no image, show error
           if (!this.image) {
+            console.error("No image is currently loaded");
             this.complianceCheck.result = {
               compliant: false,
               issues: ['No image is currently loaded. Please load an image first.'],
@@ -1086,7 +1099,11 @@ export default {
           }
         }
         
-        console.log("Starting compliance check with image:", this.image ? (typeof this.image === 'string' ? this.image.substring(0, 30) + "..." : "Image blob") : "No image");
+        console.log("Processing image for compliance check:", 
+          typeof this.image === 'string' 
+            ? `String (${this.image.substring(0, 30)}...)` 
+            : `Blob (${this.image instanceof Blob ? this.image.size + ' bytes' : 'not a blob'})`
+        );
         
         // Process the image (handles both blob URLs and base64 strings)
         const imageBlob = await ComplianceService.processImageForCompliance(this.image);
@@ -1098,13 +1115,22 @@ export default {
             issues: ['Could not process image data. The image may be invalid or corrupted.'],
             message: 'Image processing error'
           };
+          this.complianceCheck.loading = false;
           return;
         }
         
-        console.log("Image processed successfully, size:", imageBlob.size);
+        console.log("Image processed successfully, size:", imageBlob.size, "bytes, type:", imageBlob.type);
         
-        // Send to compliance service
-        const result = await ComplianceService.checkImageCompliance(imageBlob);
+        // Get background status from Vue store or local state
+        // If selectedBgColor or backgroundImageFile exists, background was replaced
+        const hasReplacedBackground = !!this.selectedBgColor || !!this.backgroundImageFile;
+        
+        // Send to compliance service with background information
+        const result = await ComplianceService.checkImageCompliance(imageBlob, {
+          hasReplacedBackground,
+          backgroundColor: this.selectedBgColor
+        });
+        
         console.log("Received compliance result:", result);
         
         // Update the result

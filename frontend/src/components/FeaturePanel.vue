@@ -65,6 +65,11 @@ export default {
           id: 'enhance',
           name: 'Photo Enhancement',
           icon: 'i-lucide-sparkles'
+        },
+        {
+          id: 'compliance-check',
+          name: 'Compliance Check',
+          icon: 'i-lucide-check-circle'
         }
       ]
     };

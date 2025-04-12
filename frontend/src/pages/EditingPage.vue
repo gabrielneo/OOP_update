@@ -49,7 +49,10 @@
         :cropWidthMm="cropWidth"
         :cropHeightMm="cropHeight"
         :imageDimensions="imageDimensions"
+        :maintain-aspect-ratio="true"
+        v-model:hide-crop-on-apply="hideCropOnApply"
         @crop-area="cropArea = $event"
+        @crop-complete="handleCropComplete"
         @resize-dimensions="handleResizeDimensions"
       />
 
@@ -69,6 +72,7 @@
         @faceDetectionChange="handleFaceDetectionChange"
         @upload-background-image="handleBackgroundImageUpload"
         @enhancement-preview="handleEnhancementPreview"
+        @reset-resize-mask="resetResizeMask"
         @request-image-for-compliance="provideImageForCompliance"
         @close="closeControlPanel"
       />
@@ -111,6 +115,7 @@ export default {
       // For enhancement preview throttling
       previewThrottleTimeout: null,
       isPreviewLoading: false,
+      hideCropOnApply: false,
     };
   },
   watch: {
@@ -377,6 +382,12 @@ export default {
       // Don't apply resize automatically - wait for user to click Apply button
     },
 
+    // Add a handler for crop completion
+    handleCropComplete() {
+      console.log('Crop operation completed and mask hidden');
+      // Can add additional logic here if needed
+    },
+
     // Update the applyChanges method to handle resize
     async applyChanges(changes) {
       console.log("Applying changes:", changes);
@@ -442,9 +453,12 @@ export default {
 
             // Clear crop related state
             this.cropArea = null;
-            if (this.$refs.imageComponent) {
-              this.$refs.imageComponent.clearCropBox();
-            }
+            
+            // Hide the crop mask and control panel by setting activeFeature to null
+            this.activeFeature = null;
+            
+            // Show success notification
+            this.showNotification("Image cropped successfully!", "success");
           } else {
             console.error("Failed to crop image:", await cropResponse.text());
           }
@@ -1152,7 +1166,10 @@ export default {
         // Pass the current image to the control panel component
         const controlPanel = this.$refs.controlPanel;
         if (controlPanel) {
+          console.log("Setting image for compliance check");
           controlPanel.image = this.currentPhoto;
+          // Immediately trigger compliance check again after setting the image
+          setTimeout(() => controlPanel.checkCompliance(), 100);
         }
       } else {
         console.error("No image available for compliance check");
@@ -1162,17 +1179,28 @@ export default {
     checkImageCompliance() {
       // Trigger the compliance check in the control panel
       if (this.$refs.controlPanel) {
+        console.log("Triggering checkCompliance on existing control panel");
         this.$refs.controlPanel.checkCompliance();
       } else {
         // If control panel isn't active, we need to create and show it
+        console.log("Control panel not active, setting to compliance-check");
         this.setActiveFeature('compliance-check');
         
         // Wait for the component to be created before calling its method
         this.$nextTick(() => {
           if (this.$refs.controlPanel) {
+            console.log("Control panel created, calling checkCompliance");
             this.$refs.controlPanel.checkCompliance();
+          } else {
+            console.error("Control panel still not available after nextTick");
           }
         });
+      }
+    },
+
+    resetResizeMask() {
+      if (this.$refs.imageComponent) {
+        this.$refs.imageComponent.resetResizeBox();
       }
     },
   },
