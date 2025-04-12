@@ -133,21 +133,18 @@
               :class="['control-btn', { active: removalMethod === 'auto' }]"
               @click="setRemovalMethod('auto')"
             >
-              Automatic
+              Automatic Mode (selected)
             </button>
-            <button
+            <!-- <button
               :class="['control-btn', { active: removalMethod === 'manual' }]"
               @click="setRemovalMethod('manual')"
             >
               Manual Selection
-            </button>
+            </button> -->
           </div>
         </div>
         <div class="control-actions">
           <button class="action-btn" @click="applyChanges">Apply</button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
         </div>
       </div>
 
@@ -191,9 +188,6 @@
         </div>
         <div class="control-actions">
           <button class="action-btn" @click="applyChanges">Apply</button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
         </div>
       </div>
 
@@ -222,9 +216,6 @@
       </div>
       <div class="control-actions">
         <button class="action-btn" @click="applyChanges">Apply</button>
-        <button class="action-btn secondary" @click="resetControls">
-          Reset
-        </button>
       </div>
     </div>
 
@@ -371,9 +362,6 @@
             :disabled="!selectedLayout"
           >
             Apply
-          </button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
           </button>
         </div>
       </div>
