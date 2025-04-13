@@ -392,7 +392,7 @@ export default {
           // Handle resize feature separately
           this.showResizeMask = true;
           this.$nextTick(() => {
-            this.initializeResizeMask();
+            this.initializeResizeBox();
           });
         } else if (newFeature === "face") {
           // No need to show any special UI for face detection initially
@@ -1117,11 +1117,28 @@ export default {
       });
     },
     initializeResizeBox() {
-      this.resetResizeBox();
-
+      // Try to get dimensions from parent's controlPanel ref
+      let resizeWidth, resizeHeight;
+      
+      if (this.$parent && this.$parent.$refs && this.$parent.$refs.controlPanel) {
+        resizeWidth = this.$parent.$refs.controlPanel.resizeWidth;
+        resizeHeight = this.$parent.$refs.controlPanel.resizeHeight;
+        
+        if (resizeWidth && resizeHeight) {
+          console.log("Initializing resize box with control panel dimensions:", resizeWidth, "x", resizeHeight);
+          this.resetResizeBox(resizeWidth, resizeHeight);
+        } else {
+          // Default fallback behavior
+          this.resetResizeBox();
+        }
+      } else {
+        // Default fallback behavior
+        this.resetResizeBox();
+      }
+      
       // Emit initial dimensions
       this.emitResizeDimensions();
-
+ 
       // Add touch event listeners for mobile devices
       this.$nextTick(() => {
         this.addTouchEventListeners();
@@ -1414,25 +1431,68 @@ export default {
         }
       });
     },
-    // Method to reset the resize box to match the current image dimensions
-    resetResizeBox() {
+    // Method to reset the resize box to match the current image dimensions or specific dimensions
+    resetResizeBox(width, height) {
       const photoImage = this.$refs.photoImage;
       if (!photoImage) return;
 
       const imgRect = photoImage.getBoundingClientRect();
+      
+      // Get the natural aspect ratio of the image
+      const naturalRatio = photoImage.naturalWidth / photoImage.naturalHeight;
+      
+      // Check if custom dimensions were provided
+      if (width && height) {
+        // Use the provided dimensions
+        const resizeWidth = width;
+        const resizeHeight = height;
+        
+        // Calculate the aspect ratio of the desired resize dimensions
+        const resizeRatio = resizeWidth / resizeHeight;
+        
+        // Calculate the scaled size to fit in the current view
+        let newWidth, newHeight;
+        
+        if (resizeRatio > naturalRatio) {
+          // Width constrained
+          newWidth = imgRect.width;
+          newHeight = newWidth / resizeRatio;
+        } else {
+          // Height constrained
+          newHeight = imgRect.height;
+          newWidth = newHeight * resizeRatio;
+        }
+        
+        // Center the resize box
+        const x = (imgRect.width - newWidth) / 2;
+        const y = (imgRect.height - newHeight) / 2;
+        
+        this.resizeBox = {
+          x: x,
+          y: y,
+          width: newWidth,
+          height: newHeight,
+        };
+        
+        console.log("Resize box set to dimensions:", resizeWidth, "x", resizeHeight, 
+                    "scaled to view as:", newWidth, "x", newHeight);
+      } else {
+        // Default behavior - match current image dimensions
+        this.resizeBox = {
+          x: 0,
+          y: 0,
+          width: imgRect.width,
+          height: imgRect.height,
+        };
+      }
 
-      this.resizeBox = {
-        x: 0,
-        y: 0,
-        width: imgRect.width,
-        height: imgRect.height,
-      };
-
-      this.aspectRatio = imgRect.width / imgRect.height;
+      this.aspectRatio = this.resizeBox.width / this.resizeBox.height;
 
       console.log(
-        "Resize box reset to match image dimensions:",
-        this.resizeBox
+        "Resize box dimensions:",
+        this.resizeBox.width,
+        "x",
+        this.resizeBox.height
       );
     },
     // Add image load handler
