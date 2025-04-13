@@ -18,15 +18,13 @@
 
           <!-- Movable crop box based on input dimensions -->
           <div
-            v-if="
-              activeFeature === 'crop' && cropWidthMm > 0 && cropHeightMm > 0
-            "
+            v-if="showCropper && cropWidthMm > 0 && cropHeightMm > 0"
             :key="`crop-${cropWidthMm}-${cropHeightMm}`"
             class="crop-box"
             :style="dimensionCropBoxStyle"
             @mousedown.stop="startMoveCropBox($event)"
           >
-            <!-- Add resize handles similar to resize box -->
+            <!-- Resize handles for crop box -->
             <div
               class="resize-handle top-left"
               @mousedown.stop="(event) => startCropResize('top-left', event)"
@@ -66,11 +64,11 @@
 
           <!-- Resize box with handles -->
           <div
-            v-if="activeFeature === 'resize' && resizeBox"
+            v-if="showResizeMask && resizeBox"
             class="resize-box"
             :style="resizeBoxStyle"
           >
-            <!-- Resize handles on corners and edges -->
+            <!-- Resize handles -->
             <div
               class="resize-handle top-left"
               @mousedown.stop="(event) => startResize('top-left', event)"
@@ -212,6 +210,9 @@ export default {
       resizeEmitTimeout: null,
       // For cleanup
       faceDetectionTimeout: null,
+      showCropper: false,
+      showResizeMask: false,
+      showFaceBounds: false,
     };
   },
   computed: {
@@ -376,16 +377,30 @@ export default {
         }
       }
     },
-    activeFeature(newVal, oldVal) {
-      if (newVal === "crop") {
-        this.$nextTick(() => {
-          this.centerCropBox();
-        });
-      } else if (newVal === "resize") {
-        this.$nextTick(() => {
-          this.initializeResizeBox();
-        });
-      }
+    activeFeature: {
+      handler(newFeature) {
+        console.log("ImageComponent: Active feature changed to", newFeature);
+        this.resetFeatureStates();
+        
+        // Set up the proper feature state
+        if (newFeature === "crop") {
+          this.showCropper = true;
+          this.$nextTick(() => {
+            this.centerCropBox();
+          });
+        } else if (newFeature === "resize") {
+          // Handle resize feature separately
+          this.showResizeMask = true;
+          this.$nextTick(() => {
+            this.initializeResizeMask();
+          });
+        } else if (newFeature === "face") {
+          // No need to show any special UI for face detection initially
+        } else if (newFeature === "background-remove" || newFeature === "background-replace") {
+          // No special UI needed for background operations
+        }
+      },
+      immediate: true,
     },
     image() {
       // Reset when image changes
@@ -1688,6 +1703,43 @@ export default {
       // Use Vue.set to ensure reactivity
       this.$set(this, 'cropWidthMm', widthMm);
       this.$set(this, 'cropHeightMm', heightMm);
+    },
+    resetFeatureStates() {
+      // Reset all feature-specific states
+      this.showCropper = false;
+      this.showResizeMask = false;
+      this.showFaceBounds = false;
+    },
+    initializeResizeMask() {
+      // Set up initial resize box to match the image size
+      if (this.$refs.photoImage && this.$refs.photoImage.naturalWidth) {
+        const imageWrapper = this.$refs.imageWrapper;
+        const image = this.$refs.photoImage;
+        
+        this.resizeBox = {
+          x: 0,
+          y: 0,
+          width: image.offsetWidth,
+          height: image.offsetHeight,
+          isResizing: false,
+          resizeHandle: null,
+          startX: 0,
+          startY: 0,
+          startWidth: 0,
+          startHeight: 0,
+        };
+        
+        // Emit initial dimensions
+        this.$emit("resize-dimensions", {
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+        });
+      }
+    },
+    
+    resetResizeMask() {
+      // Reset the resize box to the original image dimensions
+      this.initializeResizeMask();
     },
   },
   beforeDestroy() {

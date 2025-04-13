@@ -45,6 +45,7 @@ export default {
   color: #2c3e50;
   margin: 0;
   padding: 0;
+  min-width: 1050px; /* Increased from 960px to accommodate button text */
 }
 
 html, body {
@@ -52,5 +53,6 @@ html, body {
   padding: 0;
   overflow: hidden;
   height: 100%;
+  min-width: 1050px; /* Increased from 960px to match app container */
 }
 </style>

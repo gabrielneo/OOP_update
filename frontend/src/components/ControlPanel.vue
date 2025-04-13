@@ -223,7 +223,6 @@
 
       <!-- Face centering controls -->
       <div v-if="feature === 'face'" class="control-group">
-        <h3>Face Detection & Centering</h3>
         <div class="control-item mt-3">
           <button class="action-btn w-full mb-2" @click="detectFace">
             Detect & Center Face
@@ -409,28 +408,38 @@
       <!-- Compliance Check controls -->
       <div v-if="feature === 'compliance-check'" class="control-group">
         <div class="control-item">
-          <h3>Photo Compliance Check</h3>
           <p class="helper-text">Check if your photo meets the standard ID photo requirements.</p>
           
+          <div v-if="complianceCheck.loading" class="compliance-loading">
+            <div class="spinner"></div>
+            <p>Checking compliance...</p>
+          </div>
+          
+          <div v-else-if="complianceCheck.result" class="compliance-results">
+            <div class="compliance-status" :class="{ 'compliant': complianceCheck.result.compliant, 'non-compliant': !complianceCheck.result.compliant }">
+              <div class="status-icon">
+                <span v-if="complianceCheck.result.compliant">✓</span>
+                <span v-else>!</span>
+              </div>
+              <h4>{{ complianceCheck.result.message }}</h4>
+            </div>
+            
+            <div v-if="!complianceCheck.result.compliant && complianceCheck.result.issues && complianceCheck.result.issues.length > 0" class="error-message">
+              {{ complianceCheck.result.issues[0] }}
+            </div>
+          </div>
+          
           <button class="action-btn primary" @click="checkCompliance" style="margin-top: 20px;">
-            Check Compliance Now
+            Check Again
           </button>
         </div>
       </div>
     </div>
-
-    <compliance-check-modal
-      :is-visible="complianceCheck.isModalVisible"
-      :loading="complianceCheck.loading"
-      :result="complianceCheck.result"
-      @close="closeComplianceModal"
-    />
   </div>
 </template>
 
 <script>
 import ComplianceService from '../services/compliance-service';
-import ComplianceCheckModal from './ComplianceCheckModal.vue';
 
 export default {
   props: {
@@ -521,18 +530,10 @@ export default {
       selectedClothingType: "formal",
 
       complianceCheck: {
-        isModalVisible: false,
         loading: false,
-        result: {
-          compliant: false,
-          issues: [],
-          message: 'Checking compliance...'
-        }
+        result: null
       },
     };
-  },
-  components: {
-    ComplianceCheckModal
   },
   watch: {
     cropWidth: {
@@ -615,7 +616,8 @@ export default {
         face: "Face Centering",
         enhance: "Enhance",
         layout: "Layout",
-        "compliance-check": "Compliance Check"
+        "compliance-check": "Compliance Check",
+        "ai-optimize": "AI Optimization"
       };
       return titles[feature] || "Edit Photo";
     },
@@ -1070,13 +1072,8 @@ export default {
     },
     async checkCompliance() {
       console.log("Starting compliance check");
-      this.complianceCheck.isModalVisible = true;
       this.complianceCheck.loading = true;
-      this.complianceCheck.result = {
-        compliant: false,
-        issues: [],
-        message: 'Checking compliance...'
-      };
+      this.complianceCheck.result = null;
       
       try {
         // Check if image is available
@@ -1149,9 +1146,6 @@ export default {
         this.complianceCheck.loading = false;
       }
     },
-    closeComplianceModal() {
-      this.complianceCheck.isModalVisible = false;
-    },
   },
 };
 </script>
@@ -1164,10 +1158,11 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin-left: 0;
 }
 
 .panel-header {
-  padding: 15px;
+  padding: 15px 15px 15px 10px;
   border-bottom: 1px solid #3a3f45;
   display: flex;
   align-items: center;
@@ -1185,6 +1180,7 @@ export default {
   justify-content: center;
   cursor: pointer;
   margin-right: 10px;
+  flex-shrink: 0;
 }
 
 .close-btn:hover {
@@ -1193,6 +1189,7 @@ export default {
 }
 
 .panel-header h3 {
+  color: rgb(74, 144, 226);
   margin: 0;
   font-size: 16px;
   font-weight: 500;
@@ -1201,13 +1198,14 @@ export default {
 .panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 15px;
+  padding: 15px 15px 15px 0;
 }
 
 .control-group {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  padding-left: 15px;
 }
 
 .control-item {
@@ -1366,6 +1364,7 @@ export default {
 }
 
 .template-option span {
+  color: rgb(74, 144, 226);
   font-size: 12px;
   text-align: center;
 }
@@ -1627,5 +1626,102 @@ export default {
 .template-option.active {
   border: 2px solid #4a90e2;
   background-color: rgba(74, 144, 226, 0.2);
+}
+
+.compliance-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.compliance-results {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #3a3f45;
+  border-radius: 6px;
+}
+
+.compliance-status {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+.compliant {
+  background-color: rgba(46, 204, 113, 0.1);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.non-compliant {
+  background-color: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.status-icon {
+  margin-right: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.compliant .status-icon {
+  background-color: rgba(46, 204, 113, 0.2);
+  color: #27ae60;
+}
+
+.non-compliant .status-icon {
+  background-color: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+}
+
+.compliance-status h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.compliant h4 {
+  color: #27ae60;
+}
+
+.non-compliant h4 {
+  color: #e74c3c;
+}
+
+.error-message {
+  margin-top: 15px;
+  padding: 12px 16px;
+  background-color: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 4px;
+  color: #e74c3c;
+  font-size: 15px;
+}
+
+.issues-list {
+  display: none;
 }
 </style>

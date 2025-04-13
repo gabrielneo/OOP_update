@@ -15,7 +15,6 @@
       @undo="undoAction"
       @reset="resetAction"
       @redo="redoAction"
-      @check-compliance="checkImageCompliance"
       :canUndo="canUndo"
       :canRedo="canRedo"
       :canReset="canReset"
@@ -34,13 +33,13 @@
       </template>
     </Header>
 
-    <div class="main-container">
-      <!-- Feature Panel Component -->
-      <FeaturePanel
-        :activeFeature="activeFeature"
-        @feature-selected="setActiveFeature"
-      />
+    <!-- Feature Panel Component -->
+    <FeaturePanel
+      :activeFeature="activeFeature"
+      @feature-selected="setActiveFeature"
+    />
 
+    <div class="main-container">
       <!-- Image Component -->
       <ImageComponent
         ref="imageComponent"
@@ -77,11 +76,18 @@
         @close="closeControlPanel"
       />
     </div>
+    
+    <!-- Dimensions Bar - Now at the bottom of the page -->
+    <DimensionsBar
+      :imageDimensions="imageDimensions"
+      class="dimensions-bottom"
+    />
   </div>
 </template>
 
 <script>
 import Header from "../components/Header.vue";
+import DimensionsBar from "../components/DimensionsBar.vue";
 import FeaturePanel from "../components/FeaturePanel.vue";
 import ImageComponent from "../components/ImageComponent.vue";
 import ControlPanel from "../components/ControlPanel.vue";
@@ -91,6 +97,7 @@ import GoogleDriveExportButton from "../components/GoogleDriveExportButton.vue";
 export default {
   components: {
     Header,
+    DimensionsBar,
     FeaturePanel,
     ImageComponent,
     ControlPanel,
@@ -126,6 +133,12 @@ export default {
         // Force updating the crop dimensions when changing to crop feature
         this.updateCropDimensions(35, 45);
       }
+      
+      if (newVal === "resize") {
+        console.log("Feature changed to resize: Initializing resize interface");
+        // No special initialization needed beyond fetching dimensions
+        this.fetchImageDimensions();
+      }
     },
     // Log crop dimensions changes for debugging
     cropWidth(newVal) {
@@ -149,6 +162,23 @@ export default {
       if (feature === "crop") {
         console.log("Feature changed to crop: Setting default crop dimensions");
         this.updateCropDimensions(35, 45);
+      }
+      
+      // Special handling for resize feature
+      if (feature === "resize") {
+        console.log("Feature changed to resize: Fetching current dimensions");
+        this.fetchImageDimensions();
+      }
+      
+      // Automatically start compliance check when compliance-check feature is selected
+      if (feature === "compliance-check") {
+        console.log("Feature changed to compliance-check: Starting automatic compliance check");
+        // Wait for the component to be created before calling its method
+        this.$nextTick(() => {
+          if (this.$refs.controlPanel) {
+            this.$refs.controlPanel.checkCompliance();
+          }
+        });
       }
     },
     closeControlPanel() {
@@ -1177,25 +1207,9 @@ export default {
     },
 
     checkImageCompliance() {
-      // Trigger the compliance check in the control panel
-      if (this.$refs.controlPanel) {
-        console.log("Triggering checkCompliance on existing control panel");
-        this.$refs.controlPanel.checkCompliance();
-      } else {
-        // If control panel isn't active, we need to create and show it
-        console.log("Control panel not active, setting to compliance-check");
-        this.setActiveFeature('compliance-check');
-        
-        // Wait for the component to be created before calling its method
-        this.$nextTick(() => {
-          if (this.$refs.controlPanel) {
-            console.log("Control panel created, calling checkCompliance");
-            this.$refs.controlPanel.checkCompliance();
-          } else {
-            console.error("Control panel still not available after nextTick");
-          }
-        });
-      }
+      // This function is now a no-op since the compliance button was removed
+      console.log("Compliance check button was removed, this function is no longer used");
+      return;
     },
 
     resetResizeMask() {
@@ -1218,16 +1232,12 @@ export default {
 
 <style scoped>
 .editing-page {
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100%;
   background-color: #1e2124;
-  color: #ffffff;
-  font-family: "Inter", sans-serif;
   overflow: hidden;
-  margin: 0;
-  padding: 0;
+  min-width: 1050px; /* Increased from 960px to match app container */
 }
 
 .main-container {
@@ -1236,6 +1246,12 @@ export default {
   overflow: hidden;
   margin-top: 0;
   padding-top: 0;
+  min-width: 1050px; /* Increased from 960px to match app container */
+}
+
+.dimensions-bottom {
+  margin-top: auto;
+  padding-bottom: 10px; /* Add padding to the bottom */
 }
 
 .header-google-drive-btn {
