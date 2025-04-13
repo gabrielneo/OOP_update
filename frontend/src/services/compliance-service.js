@@ -34,11 +34,14 @@ class ComplianceService {
       formData.append('image', imageBlob, 'image.jpg');
       
       // Add background replacement information if available
-      if (options.hasReplacedBackground) {
+      if (options.hasReplacedBackground === true) {
+        console.log('Adding background replacement info to request');
         formData.append('hasReplacedBackground', 'true');
-        if (options.backgroundColor) {
+        if (options.backgroundColor && options.backgroundColor !== '') {
           formData.append('backgroundColor', options.backgroundColor);
         }
+      } else {
+        console.log('No background replacement detected');
       }
       
       console.log('Sending compliance check request to server...');

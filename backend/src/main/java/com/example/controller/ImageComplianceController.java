@@ -30,6 +30,12 @@ public class ImageComplianceController {
             @RequestParam(value = "backgroundColor", required = false) String backgroundColor) {
         
         try {
+            // Validate hasReplacedBackground flag - it should only be true if backgroundColor is also provided
+            if (hasReplacedBackground && (backgroundColor == null || backgroundColor.isEmpty())) {
+                logger.warn("hasReplacedBackground flag is true but no backgroundColor provided - setting to false");
+                hasReplacedBackground = false;
+            }
+            
             logger.info("Received compliance check request for image: {}, hasReplacedBackground: {}, backgroundColor: {}", 
                      image.getOriginalFilename(), hasReplacedBackground, backgroundColor);
             
