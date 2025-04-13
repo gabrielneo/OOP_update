@@ -26,7 +26,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
-import com.example.services.GoogleDriveService;
+import com.example.services.*;
 
 /**
  * Controller for handling Google OAuth2 authentication.
@@ -57,12 +57,16 @@ public class AuthController {
     private final GoogleDriveService driveService;
 
     @Autowired
-    public AuthController(GoogleAuthorizationCodeFlow authorizationFlow, GoogleDriveService driveService) {
-        this.authorizationFlow = authorizationFlow;
+    public AuthController(GoogleDriveConfig driveConfig, GoogleDriveService driveService) {
+        try {
+            this.authorizationFlow = driveConfig.authorizationCodeFlow();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to initialize GoogleAuthorizationCodeFlow", e);
+        }
         this.driveService = driveService;
         logger.info("AuthController initialized with authorization flow");
     }
-
+ 
     /**
      * Root endpoint for auth API to check if it's available
      * 

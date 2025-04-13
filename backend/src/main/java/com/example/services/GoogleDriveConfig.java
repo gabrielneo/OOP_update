@@ -24,6 +24,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Configuration class for Google Drive API integration.
@@ -48,6 +49,9 @@ public class GoogleDriveConfig {
     private static final List<String> SCOPES = Collections.singletonList(DriveScopes.DRIVE);
     // Ensure consistent USER_ID across all components
     private static final String USER_ID = "user";
+    
+    // @Autowired
+    // private GoogleAuthorizationCodeFlow authorizationCodeFlow;
 
     /**
      * Creates the GoogleAuthorizationCodeFlow for OAuth2 authorization.
@@ -56,7 +60,7 @@ public class GoogleDriveConfig {
      * @return GoogleAuthorizationCodeFlow object
      * @throws IOException If the credentials file cannot be found
      */
-    @Bean
+    // @Bean
     public GoogleAuthorizationCodeFlow authorizationCodeFlow() throws IOException {
         // Load client secrets from classpath
         InputStream in = getClass().getResourceAsStream("/credential.json");
@@ -117,7 +121,7 @@ public class GoogleDriveConfig {
      * @throws GeneralSecurityException If there is a security issue with Google
      *                                  APIs
      */
-    @Bean
+    // @Bean
     public Drive driveService() throws IOException, GeneralSecurityException {
         final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
 
