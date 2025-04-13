@@ -151,6 +151,11 @@ public class PhotoLayoutService {
         BufferedImage finalImage = new BufferedImage(finalWidthPx, finalHeightPx, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = finalImage.createGraphics();
 
+        // Set rendering hints for better quality
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
         // Set background to white
         g2d.setColor(Color.WHITE);
         g2d.fillRect(0, 0, finalWidthPx, finalHeightPx);
@@ -159,12 +164,35 @@ public class PhotoLayoutService {
         int cellWidth = finalWidthPx / cols;
         int cellHeight = finalHeightPx / rows;
 
-        // Draw each cell
+        // Calculate image aspect ratio
+        double imageAspectRatio = (double) image.getWidth() / image.getHeight();
+        
+        // Draw each cell with properly scaled image
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < cols; col++) {
                 int x = col * cellWidth;
                 int y = row * cellHeight;
-                g2d.drawImage(image, x, y, cellWidth, cellHeight, null);
+                
+                // Calculate dimensions that maintain aspect ratio within the cell
+                int scaledWidth, scaledHeight;
+                int offsetX = 0, offsetY = 0;
+                
+                double cellAspectRatio = (double) cellWidth / cellHeight;
+                
+                if (imageAspectRatio > cellAspectRatio) {
+                    // Image is wider than cell (constrain by width)
+                    scaledWidth = cellWidth;
+                    scaledHeight = (int) (cellWidth / imageAspectRatio);
+                    offsetY = (cellHeight - scaledHeight) / 2; // Center vertically
+                } else {
+                    // Image is taller than cell (constrain by height)
+                    scaledHeight = cellHeight;
+                    scaledWidth = (int) (cellHeight * imageAspectRatio);
+                    offsetX = (cellWidth - scaledWidth) / 2; // Center horizontally
+                }
+                
+                // Draw the image with maintained aspect ratio and centered in the cell
+                g2d.drawImage(image, x + offsetX, y + offsetY, scaledWidth, scaledHeight, null);
             }
         }
 

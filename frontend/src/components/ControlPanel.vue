@@ -305,19 +305,6 @@
           </div>
         </div>
         <div class="control-item">
-          <label>Border Size (mm):</label>
-          <div class="size-inputs">
-            <input
-              type="number"
-              v-model.number="borderSize"
-              class="size-input"
-              min="0"
-              max="20"
-              @change="calculateLayoutDimensions"
-            />
-          </div>
-        </div>
-        <div class="control-item">
           <label>Grid Layout:</label>
           <div class="grid-layout-options">
             <button
@@ -382,13 +369,6 @@
               </div>
             </div>
             <div class="layout-info">
-              <p v-if="borderSize === 0">
-                No border will be applied to the images.
-              </p>
-              <p v-else>
-                Original with border: {{ originalWithBorderWidth }}mm ×
-                {{ originalWithBorderHeight }}mm
-              </p>
               <p style="color: white;">Final layout size: {{ finalWidth }}mm × {{ finalHeight }}mm</p>
             </div>
           </div>
@@ -733,7 +713,6 @@ export default {
           previewInProgress: false,
         });
       } else if (this.feature === "layout") {
-        this.borderSize = 5;
         this.selectedLayout = null;
         this.customRows = 2;
         this.customCols = 2;
@@ -849,7 +828,7 @@ export default {
           originalHeight: this.originalWithBorderHeight,
           finalWidth: this.finalWidth,
           finalHeight: this.finalHeight,
-          useOriginalImage: true, // Explicitly tell backend to use original image
+          useOriginalImage: true,
         };
 
         // Reset selections after applying to prevent recursive layouts
@@ -1085,7 +1064,7 @@ export default {
           originalHeightMm = Math.round(this.imageDimensions.height * pxToMm);
         }
 
-        // Calculate dimensions with border
+        // Calculate dimensions with fixed border (5mm)
         this.originalWithBorderWidth = originalWidthMm + this.borderSize * 2;
         this.originalWithBorderHeight = originalHeightMm + this.borderSize * 2;
 
