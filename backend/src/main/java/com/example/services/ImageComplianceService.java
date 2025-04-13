@@ -248,13 +248,12 @@ public class ImageComplianceService {
         int width = image.getWidth();
         int height = image.getHeight();
         
-        // Check aspect ratio
-        double aspectRatio = (double) width / height;
-        double standardRatio = 3.0 / 4.0; // Common ID photo ratio (3:4)
-        
-        // Allow some tolerance in aspect ratio (±15%)
-        if (Math.abs(aspectRatio - standardRatio) / standardRatio > 0.15) {
-            response.addIssue("Image aspect ratio is not standard (should be approximately 3:4)");
+        // STRICT CHECK: Image MUST be exactly 400px x 514px with absolutely no tolerance
+        if (width != 400 || height != 514) {
+            response.addIssue("Image dimensions must be exactly 400px x 514px (current: " + width + "px x " + height + "px)");
+            System.out.println("COMPLIANCE CHECK FAILED: Dimensions " + width + "x" + height + " do not match required 400x514");
+        } else {
+            System.out.println("COMPLIANCE CHECK PASSED: Dimensions are exactly 400x514");
         }
     }
     

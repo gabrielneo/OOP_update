@@ -79,8 +79,11 @@
           <div class="size-display" v-if="imageDimensions">
             {{ Math.round(imageDimensions.width * 0.264583) }}mm ×
             {{ Math.round(imageDimensions.height * 0.264583) }}mm
+            ({{ imageDimensions.width }}px × {{ imageDimensions.height }}px)
           </div>
         </div>
+        
+        <!-- Dimensions in millimeters -->
         <div class="control-item">
           <label>New Dimensions (mm):</label>
           <div class="size-inputs ">
@@ -102,7 +105,58 @@
               step="1"
             />
           </div>
-          <div class="aspect-ratio-info">
+        </div>
+        
+        <!-- Dimensions in pixels -->
+        <div class="control-item">
+          <label>New Dimensions (px):</label>
+          <div class="size-inputs">
+            <input
+              type="number"
+              v-model.number="resizeWidth"
+              @change="calculateHeightFromWidth"
+              class="size-input"
+              min="1"
+              step="1"
+            />
+            ×
+            <input
+              type="number"
+              v-model.number="resizeHeight"
+              @change="calculateWidthFromHeight"
+              class="size-input"
+              min="1"
+              step="1"
+            />
+          </div>
+        </div>
+        
+        <!-- Options -->
+        <div class="control-item">
+          <div class="resize-options">
+            <div class="option-item">
+              <input
+                type="checkbox"
+                id="maintainAspectRatio"
+                v-model="maintainAspectRatio"
+              />
+              <label for="maintainAspectRatio">Maintain aspect ratio</label>
+            </div>
+            <div class="option-item">
+              <input
+                type="checkbox"
+                id="useExactDimensions"
+                v-model="useExactDimensions"
+              />
+              <label for="useExactDimensions">Use exact dimensions</label>
+            </div>
+            
+            <div class="preset-buttons" v-if="useExactDimensions">
+              <button class="preset-btn" @click="setComplianceDimensions">Set to 400×514 px</button>
+            </div>
+          </div>
+          
+          <div class="aspect-ratio-info" v-if="maintainAspectRatio && !useExactDimensions">
             <i-lucide-lock class="lock-icon" />
             <span>Current aspect ratio maintained. <br> Use 'Crop' tool to change aspect ratio</span>
           </div>
@@ -424,8 +478,10 @@
               <h4>{{ complianceCheck.result.message }}</h4>
             </div>
             
-            <div v-if="!complianceCheck.result.compliant && complianceCheck.result.issues && complianceCheck.result.issues.length > 0" class="error-message">
-              {{ complianceCheck.result.issues[0] }}
+            <div v-if="!complianceCheck.result.compliant && complianceCheck.result.issues && complianceCheck.result.issues.length > 0" class="error-messages">
+              <div v-for="(issue, index) in complianceCheck.result.issues" :key="index" class="error-message">
+                {{ issue }}
+              </div>
             </div>
           </div>
           
@@ -485,6 +541,8 @@ export default {
       resizeWidthMm: 0,
       resizeHeightMm: 0,
       originalAspectRatio: 1,
+      maintainAspectRatio: true,
+      useExactDimensions: false,
 
       // Background removal state
       removalMethod: "auto",
@@ -724,16 +782,19 @@ export default {
           type: "resize",
           width: this.resizeWidth,
           height: this.resizeHeight,
-          maintainAspectRatio: true,
+          maintainAspectRatio: !this.useExactDimensions && this.maintainAspectRatio,
           widthProvided: true,
           heightProvided: true,
+          useExactDimensions: this.useExactDimensions
         };
 
         console.log(
           "Sending resize request with dimensions:",
           this.resizeWidth,
           "x",
-          this.resizeHeight
+          this.resizeHeight,
+          "useExactDimensions:",
+          this.useExactDimensions
         );
       } else if (this.feature === "clothes") {
         changes = {
@@ -869,6 +930,33 @@ export default {
         this.resizeHeight = Math.round(this.resizeHeightMm / 0.264583);
       }
     },
+    
+    calculateHeightFromWidth() {
+      if (this.maintainAspectRatio && this.originalAspectRatio && this.resizeWidth > 0) {
+        this.resizeHeight = Math.round(this.resizeWidth / this.originalAspectRatio);
+        // Update mm values
+        this.resizeWidthMm = Math.round(this.resizeWidth * 0.264583);
+        this.resizeHeightMm = Math.round(this.resizeHeight * 0.264583);
+      }
+    },
+    
+    calculateWidthFromHeight() {
+      if (this.maintainAspectRatio && this.originalAspectRatio && this.resizeHeight > 0) {
+        this.resizeWidth = Math.round(this.resizeHeight * this.originalAspectRatio);
+        // Update mm values
+        this.resizeWidthMm = Math.round(this.resizeWidth * 0.264583);
+        this.resizeHeightMm = Math.round(this.resizeHeight * 0.264583);
+      }
+    },
+    
+    setComplianceDimensions() {
+      // Set to standard compliance dimensions (400x514 pixels)
+      this.resizeWidth = 400;
+      this.resizeHeight = 514;
+      // Update mm values
+      this.resizeWidthMm = Math.round(this.resizeWidth * 0.264583);
+      this.resizeHeightMm = Math.round(this.resizeHeight * 0.264583);
+    },
 
     resetResizeControls() {
       if (this.imageDimensions) {
@@ -878,6 +966,8 @@ export default {
         this.resizeHeightMm = Math.round(
           this.imageDimensions.height * 0.264583
         );
+        this.maintainAspectRatio = true;
+        this.useExactDimensions = false;
         
         // Emit a custom event to reset the resize mask in the image component
         this.$emit("reset-resize-mask");
@@ -1711,8 +1801,14 @@ export default {
   color: #e74c3c;
 }
 
-.error-message {
+.error-messages {
   margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.error-message {
   padding: 12px 16px;
   background-color: rgba(231, 76, 60, 0.1);
   border: 1px solid rgba(231, 76, 60, 0.3);
@@ -1721,7 +1817,40 @@ export default {
   font-size: 15px;
 }
 
-.issues-list {
-  display: none;
+.resize-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-item label {
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.preset-buttons {
+  margin-top: 8px;
+}
+
+.preset-btn {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.preset-btn:hover {
+  background-color: #3a80d2;
 }
 </style>
