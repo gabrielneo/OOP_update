@@ -31,7 +31,7 @@
           </div>
         </div>
         <div class="control-item">
-          <label>Size (mm)</label>
+          <label>Current Crop ratio</label>
           <div class="size-inputs">
             <input
               type="number"
@@ -57,17 +57,17 @@
               min="0.1"
             />
           </div>
-          <button
+          <!-- <button
             class="action-btn apply-dimensions-btn"
             @click="applyDimensions"
           >
             Apply Dimensions
-          </button>
+          </button> -->
         </div>
         <div class="control-actions">
-          <button class="action-btn" @click="applyChanges">Apply</button>
+          <button class="action-btn" @click="applyChanges">Crop</button>
           <button class="action-btn secondary" @click="resetControls">
-            Reset
+            Reset inputs
           </button>
         </div>
       </div>
@@ -83,7 +83,7 @@
         </div>
         <div class="control-item">
           <label>New Dimensions (mm):</label>
-          <div class="size-inputs">
+          <div class="size-inputs ">
             <input
               type="number"
               v-model.number="resizeWidthMm"
@@ -104,7 +104,7 @@
           </div>
           <div class="aspect-ratio-info">
             <i-lucide-lock class="lock-icon" />
-            <span>Aspect ratio maintained</span>
+            <span>Current aspect ratio maintained. <br> Use 'Crop' tool to change aspect ratio</span>
           </div>
           <div class="resize-tip">
             <i-lucide-info class="info-icon" />
@@ -116,7 +116,7 @@
         </div>
         <div class="control-actions">
           <button class="action-btn primary" @click="applyChanges">
-            Apply Resize
+            Resize
           </button>
           <button class="action-btn secondary" @click="resetResizeControls">
             Reset
@@ -130,7 +130,7 @@
           <label>Removal Method</label>
           <div class="method-options">
             <button
-              :class="['control-btn', { active: removalMethod === 'auto' }]"
+              :class="['upload-bg-btn', { active: removalMethod === 'auto' }]"
               @click="setRemovalMethod('auto')"
             >
               Automatic Mode (selected)
@@ -144,7 +144,7 @@
           </div>
         </div>
         <div class="control-actions">
-          <button class="action-btn" @click="applyChanges">Apply</button>
+          <button class="action-btn" @click="applyChanges">Remove Background</button>
         </div>
       </div>
 
@@ -201,6 +201,7 @@
             :class="{ active: selectedClothingType === 'male' }"
             @click="setClothingType('male')"
           >
+            <img src='/assets/MaleSuit.png' alt=''>
             <span>Formal Suit</span>
             <span>(Male)</span>
           </div>
@@ -209,6 +210,7 @@
             :class="{ active: selectedClothingType === 'female' }"
             @click="setClothingType('female')"
           >
+          <img src='/assets/FemaleSuit.png' alt=''>
           <span>Formal Suit</span>
           <span>(Female)</span>
           </div>
@@ -223,7 +225,7 @@
       <div v-if="feature === 'face'" class="control-group">
         <h3>Face Detection & Centering</h3>
         <div class="control-item mt-3">
-          <button class="primary-button w-full mb-2" @click="detectFace">
+          <button class="action-btn w-full mb-2" @click="detectFace">
             Detect & Center Face
           </button>
 
@@ -1247,6 +1249,7 @@ export default {
 .size-inputs {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
