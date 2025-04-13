@@ -1123,14 +1123,7 @@ export default {
         
         // Get background status from Vue store or local state
         // If selectedBgColor or backgroundImageFile exists, background was replaced
-        const hasReplacedBackground = (this.selectedBgColor && this.selectedBgColor !== '') || 
-                                     (this.backgroundImageFile && this.backgroundImageFile.size > 0);
-        
-        console.log("Background replacement status:", { 
-          hasReplacedBackground, 
-          selectedBgColor: this.selectedBgColor, 
-          hasBackgroundImage: !!this.backgroundImageFile 
-        });
+        const hasReplacedBackground = !!this.selectedBgColor || !!this.backgroundImageFile;
         
         // Send to compliance service with background information
         const result = await ComplianceService.checkImageCompliance(imageBlob, {
