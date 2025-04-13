@@ -76,7 +76,7 @@
       <div v-if="feature === 'resize'" class="control-group">
         <div class="control-item">
           <label>Current Dimensions:</label>
-          <div class="size-display" v-if="imageDimensions">
+          <div class="size-display" v-if="imageDimensions" style="color: white;">
             {{ Math.round(imageDimensions.width * 0.264583) }}mm ×
             {{ Math.round(imageDimensions.height * 0.264583) }}mm
             ({{ imageDimensions.width }}px × {{ imageDimensions.height }}px)
@@ -95,7 +95,7 @@
               min="1"
               step="1"
             />
-            ×
+            <span style="color: rgb(74, 144, 226);">×</span>
             <input
               type="number"
               v-model.number="resizeHeightMm"
@@ -119,7 +119,7 @@
               min="1"
               step="1"
             />
-            ×
+            <span style="color: rgb(74, 144, 226);">×</span>
             <input
               type="number"
               v-model.number="resizeHeight"
@@ -256,8 +256,8 @@
             @click="setClothingType('male')"
           >
             <img src='/assets/MaleSuit.png' alt=''>
-            <span>Formal Suit</span>
-            <span>(Male)</span>
+            <span style="color: white;">Formal Suit</span>
+            <span style="color: white;">(Male)</span>
           </div>
           <div 
             class="template-option" 
@@ -265,8 +265,8 @@
             @click="setClothingType('female')"
           >
           <img src='/assets/FemaleSuit.png' alt=''>
-          <span>Formal Suit</span>
-          <span>(Female)</span>
+          <span style="color: white;">Formal Suit</span>
+          <span style="color: white;">(Female)</span>
           </div>
         </div>
       </div>
@@ -283,7 +283,7 @@
           </button>
 
           <div class="detection-options mt-3">
-            <h4 class="text-sm font-semibold mb-2">Advanced Options</h4>
+            <h4 class="text-sm font-semibold mb-2" style="color: white;">Advanced Options</h4>
             <div class="option-item">
               <input
                 type="checkbox"
@@ -316,7 +316,7 @@
       <div v-if="feature === 'layout'" class="control-group">
         <div class="control-item">
           <label>Current Image Dimensions:</label>
-          <div class="size-display" v-if="imageDimensions">
+          <div class="size-display" v-if="imageDimensions" style="color: white;">
             {{ imageDimensions.width }}px × {{ imageDimensions.height }}px
           </div>
         </div>
@@ -405,7 +405,7 @@
                 Original with border: {{ originalWithBorderWidth }}mm ×
                 {{ originalWithBorderHeight }}mm
               </p>
-              <p>Final layout size: {{ finalWidth }}mm × {{ finalHeight }}mm</p>
+              <p style="color: white;">Final layout size: {{ finalWidth }}mm × {{ finalHeight }}mm</p>
             </div>
           </div>
         </div>
@@ -432,7 +432,7 @@
             v-model="previewBrightness"
             class="slider-input"
           />
-          <span class="slider-value">{{ previewBrightness }}</span>
+          <span class="slider-value" style="color: rgb(74, 144, 226)">{{ previewBrightness }}</span>
         </div>
         <div class="control-item slider">
           <label>Contrast</label>
@@ -443,7 +443,7 @@
             v-model="previewContrast"
             class="slider-input"
           />
-          <span class="slider-value">{{ previewContrast }}</span>
+          <span style="color: rgb(74, 144, 226)" class="slider-value">{{ previewContrast }}</span>
         </div>
         <div class="enhancement-info" v-if="enhancementActive">
           <div class="info-text">

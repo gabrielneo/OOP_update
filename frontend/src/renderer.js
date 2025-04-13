@@ -6,22 +6,8 @@ import App from "./App.vue"; //can write as import App from "@/App.vue", the @ d
 // Import Google API service
 import googleApiService from "./services/google-api-service";
 
-// import MessageComponent from "./components/MessageComponent.vue";
+// Import router from the central router.js file
+import router from "./router";
 
-import { createWebHistory, createRouter } from "vue-router";
-
-import LandingPage from "./pages/LandingPage.vue";
-import EditingPage from "./pages/EditingPage.vue";
-
-const routes = [
-    { path: "/EditingPage", component: EditingPage },
-    { path: "/", component: LandingPage },
-    // { path: "/profile", component: ProfilePage }
-];
-
-const router = createRouter({
-    history: createWebHistory(),
-    routes,
-});
-
+// Create and mount the app
 createApp(App).use(router).mount("#app");

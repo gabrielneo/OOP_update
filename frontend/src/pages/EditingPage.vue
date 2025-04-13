@@ -40,10 +40,16 @@
     />
 
     <div class="main-container">
+      <!-- Non-blocking message when no image is uploaded -->
+      <div v-if="!currentPhoto" class="no-image-message-container">
+        <div class="no-image-message">Upload your image to start first!</div>
+      </div>
+
       <!-- Image Component -->
       <ImageComponent
+        v-if="currentPhoto"
         ref="imageComponent"
-        :image="currentPhoto || '/assets/zhiyuan.jpg'"
+        :image="currentPhoto"
         :activeFeature="activeFeature"
         :cropWidthMm="cropWidth"
         :cropHeightMm="cropHeight"
@@ -54,6 +60,7 @@
         @crop-complete="handleCropComplete"
         @resize-dimensions="handleResizeDimensions"
       />
+      <div v-else class="empty-canvas"></div>
 
       <!-- Control Panel Component (only shown when a feature is selected) -->
       <ControlPanel
@@ -1295,5 +1302,33 @@ export default {
 .header-google-drive-btn :deep(.drive-button:disabled) {
   color: #5a5f65;
   cursor: not-allowed;
+}
+
+/* Updated styles for non-blocking message */
+.no-image-message-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  pointer-events: none; /* Allow interaction with elements below */
+}
+
+.no-image-message {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 15px 25px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.empty-canvas {
+  flex: 1;
+  background-color: #2d3035;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 </style>
