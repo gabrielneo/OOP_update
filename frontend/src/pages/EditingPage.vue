@@ -416,13 +416,7 @@ export default {
         };
       }
 
-      // Update the ControlPanel with the new dimensions if it exists and resize feature is active
-      if (this.$refs.controlPanel && this.activeFeature === 'resize') {
-        this.$refs.controlPanel.resizeWidth = dimensions.width;
-        this.$refs.controlPanel.resizeHeight = dimensions.height;
-        this.$refs.controlPanel.resizeWidthMm = Math.round(dimensions.width * 0.264583);
-        this.$refs.controlPanel.resizeHeightMm = Math.round(dimensions.height * 0.264583);
-      }
+      // Don't apply resize automatically - wait for user to click Apply button
     },
 
     // Add a handler for crop completion
@@ -1226,16 +1220,7 @@ export default {
     },
 
     resetResizeMask() {
-      if (this.$refs.imageComponent && this.$refs.controlPanel) {
-        // Get the dimensions from the ControlPanel
-        const resizeWidth = this.$refs.controlPanel.resizeWidth;
-        const resizeHeight = this.$refs.controlPanel.resizeHeight;
-        
-        console.log("Resetting resize mask with dimensions:", resizeWidth, "x", resizeHeight);
-        
-        // Pass the dimensions to the resetResizeBox method
-        this.$refs.imageComponent.resetResizeBox(resizeWidth, resizeHeight);
-      } else if (this.$refs.imageComponent) {
+      if (this.$refs.imageComponent) {
         this.$refs.imageComponent.resetResizeBox();
       }
     },
