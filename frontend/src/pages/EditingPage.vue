@@ -1,73 +1,38 @@
 <template>
   <div class="editing-page">
-    <input
-      type="file"
-      ref="fileInput"
-      @change="uploadNewImage"
-      style="display: none"
-      accept="image/*"
-    />
+    <input type="file" ref="fileInput" @change="uploadNewImage" style="display: none" accept="image/*" />
     <!-- Header Component -->
-    <Header
-      @new-project="createNewProject"
-      @save-project="saveProject"
-      @export-project="exportProject"
-      @undo="undoAction"
-      @reset="resetAction"
-      @redo="redoAction"
-      :canUndo="canUndo"
-      :canRedo="canRedo"
-      :canReset="canReset"
-      :imageDimensions="imageDimensions"
-    >
+    <Header @new-project="createNewProject" @save-project="saveProject" @export-project="exportProject"
+      @undo="undoAction" @reset="resetAction" @redo="redoAction" :canUndo="canUndo" :canRedo="canRedo"
+      :canReset="canReset" :imageDimensions="imageDimensions">
       <template v-slot:google-drive-button>
         <GoogleDriveImagePicker @image-selected="handleDriveImage" class="header-google-drive-btn" />
       </template>
       <template v-slot:google-drive-export-button>
-        <GoogleDriveExportButton 
-          @export-success="handleExportSuccess" 
-          @export-error="handleExportError"
-          @auth-required="handleAuthRequired"
-          class="header-google-drive-btn" 
-        />
+        <GoogleDriveExportButton @export-success="handleExportSuccess" @export-error="handleExportError"
+          @auth-required="handleAuthRequired" class="header-google-drive-btn" />
       </template>
     </Header>
 
     <div class="main-container">
       <!-- Feature Panel Component -->
-      <FeaturePanel
-        :activeFeature="activeFeature"
-        @feature-selected="setActiveFeature"
-      />
+      <FeaturePanel :activeFeature="activeFeature" @feature-selected="setActiveFeature" />
 
-      <!-- Image Component -->
-      <ImageComponent
-        ref="imageComponent"
-        :image="currentPhoto || '/assets/zhiyuan.jpg'"
-        :activeFeature="activeFeature"
-        :cropWidthMm="cropWidth"
-        :cropHeightMm="cropHeight"
-        :imageDimensions="imageDimensions"
-        @crop-area="cropArea = $event"
-        @resize-dimensions="handleResizeDimensions"
-      />
+      <div class="content-area">
+        <!-- Image Component -->
+        <ImageComponent ref="imageComponent" :image="currentPhoto" :activeFeature="activeFeature"
+          :cropWidthMm="cropWidth" :cropHeightMm="cropHeight" :imageDimensions="imageDimensions"
+          @crop-area="cropArea = $event" @resize-dimensions="handleResizeDimensions" />
+        <ImageSelectorPanel v-if="Object.keys(images).length > 1" :images="images" :selectedImage="selectedImageKey"
+          @select-image="selectImage" @add-image="openFileDialog" />
+      </div>
 
       <!-- Control Panel Component (only shown when a feature is selected) -->
-      <ControlPanel
-        v-if="activeFeature"
-        :feature="activeFeature"
-        :cropWidth="cropWidth"
-        :cropHeight="cropHeight"
-        :imageDimensions="imageDimensions"
-        @update:cropWidth="cropWidth = $event"
-        @update:cropHeight="cropHeight = $event"
-        @apply-changes="applyChanges"
-        @apply-dimensions="setManualDimensions"
-        @faceDetectionChange="handleFaceDetectionChange"
-        @upload-background-image="handleBackgroundImageUpload"
-        @enhancement-preview="handleEnhancementPreview"
-        @close="closeControlPanel"
-      />
+      <ControlPanel v-if="activeFeature" :feature="activeFeature" :cropWidth="cropWidth" :cropHeight="cropHeight"
+        :imageDimensions="imageDimensions" @update:cropWidth="cropWidth = $event"
+        @update:cropHeight="cropHeight = $event" @apply-changes="applyChanges" @apply-dimensions="setManualDimensions"
+        @faceDetectionChange="handleFaceDetectionChange" @upload-background-image="handleBackgroundImageUpload"
+        @enhancement-preview="handleEnhancementPreview" @close="closeControlPanel" />
     </div>
   </div>
 </template>
@@ -79,6 +44,9 @@ import ImageComponent from "../components/ImageComponent.vue";
 import ControlPanel from "../components/ControlPanel.vue";
 import GoogleDriveImagePicker from "../components/GoogleDriveImagePicker.vue";
 import GoogleDriveExportButton from "../components/GoogleDriveExportButton.vue";
+import ImageSelectorPanel from '../components/ImageSelectorPanel.vue';
+import axios from '../axiosConfig';
+
 
 export default {
   components: {
@@ -88,6 +56,7 @@ export default {
     ControlPanel,
     GoogleDriveImagePicker,
     GoogleDriveExportButton,
+    ImageSelectorPanel
   },
   data() {
     return {
@@ -107,6 +76,8 @@ export default {
       // For enhancement preview throttling
       previewThrottleTimeout: null,
       isPreviewLoading: false,
+      selectedImageKey:null,
+      images:[]
     };
   },
   watch: {
@@ -364,7 +335,7 @@ export default {
             height: Math.floor(Math.max(1, cropPxHeight * scaleY)),
           };
 
-          console.log("Calculated crop area:", this.cropArea);
+          // console.log("Calculated crop area:", this.cropArea);
         }
 
         // now call backend crop
@@ -383,8 +354,8 @@ export default {
           };
 
           console.log("Sending crop request:", cropRequest);
-
-          const cropResponse = await fetch("http://localhost:8080/api/crop", {
+          console.log("selected image"+this.selectedImageKey)
+          const cropResponse = await fetch("http://localhost:8080/api/crop?key=" + this.selectedImageKey, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(cropRequest),
@@ -393,6 +364,7 @@ export default {
           if (cropResponse.ok) {
             // Update the image and all related state
             await this.updateImageAfterEdit();
+            await this.getImagesFromStore();
 
             // Clear crop related state
             this.cropArea = null;
@@ -619,9 +591,64 @@ export default {
         console.error("Error updating image after edit:", error);
       }
     },
+    selectImage(filename) {
+      this.selectedImageKey = filename;
+      console.log("Test"+this.images)
+      const imageData = this.images[filename]; // Update current photo when a new image is selected
+// console.log("HELPP"+imageData)
+      // this.currentPhoto = `data:${imageData.mimeType};base64,${imageData.content}`;
 
+      // const firstKey = Object.keys(this.images)[0];
+      const byteArray = this.images[filename];
+
+      const mimeType = this.getMimeTypeFromFilename(filename);
+      const uint8Array = new Uint8Array(byteArray);
+      const blob = new Blob([uint8Array], { type: mimeType });
+
+      if (this.currentPhoto) {
+        URL.revokeObjectURL(this.currentPhoto);
+      }
+      this.currentPhoto = `data:${mimeType};base64,${byteArray}`;
+      this.selectedImageKey = filename;
+    },
+    async getImagesFromStore() {
+      try {
+        const response = await axios.get('http://localhost:8080/api/image/all'); // Adjust the URL if needed
+        this.images = response.data; // Assign the image data to the component's data
+        
+        console.log('Fetched images:', this.images);
+      } catch (error) {
+        console.error("Error fetching images: ", error);
+      }
+      const firstKey = Object.keys(this.images)[0];
+      const byteArray = this.images[firstKey];
+
+      const mimeType = this.getMimeTypeFromFilename(firstKey);
+      const uint8Array = new Uint8Array(byteArray);
+      const blob = new Blob([uint8Array], { type: mimeType });
+
+      if (this.currentPhoto) {
+        URL.revokeObjectURL(this.currentPhoto);
+      }
+      this.currentPhoto = `data:${mimeType};base64,${byteArray}`;
+      this.selectedImageKey = firstKey;
+
+    },
+getMimeTypeFromFilename(filename) {
+    const extension = filename.split('.').pop().toLowerCase();
+    switch (extension) {
+      case 'png': return 'image/png';
+      case 'jpg':
+      case 'jpeg': return 'image/jpeg';
+      case 'gif': return 'image/gif';
+      case 'bmp': return 'image/bmp';
+      case 'webp': return 'image/webp';
+      default: return 'application/octet-stream';
+    }
+  },
     // Method to check for existing image on component mount
     async checkForExistingImage() {
+      
       try {
         const response = await fetch("http://localhost:8080/api/image/get");
         if (response.ok) {
@@ -983,14 +1010,14 @@ export default {
         const file = new File([blob], imageData.name || "google_drive_image.jpg", { type: imageData.mimeType });
         
         // Append file to form data - this matches the expected format for backend upload
-        formData.append("file", file);
+        formData.append("files", file);
         
         // Send the request using the same endpoint as regular file uploads
         const response = await fetch("http://localhost:8080/api/upload", {
           method: "POST",
           body: formData
         });
-        
+        console.log("form data:", file);
         if (response.ok) {
           console.log("Google Drive image uploaded to backend server successfully");
           // Update image dimensions after upload
@@ -1057,6 +1084,7 @@ export default {
   mounted() {
     // Check if an image is already available and fetch its dimensions
     this.checkForExistingImage();
+    this.getImagesFromStore();
   },
 };
 </script>
@@ -1109,5 +1137,13 @@ export default {
 .header-google-drive-btn :deep(.drive-button:disabled) {
   color: #5a5f65;
   cursor: not-allowed;
+}
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  /* Added to contain the ImageSelectorPanel */
 }
 </style>

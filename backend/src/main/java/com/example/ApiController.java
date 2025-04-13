@@ -8,14 +8,8 @@ import com.example.dto.FaceCenteringRequest;
 import com.example.dto.PhotoEnhanceRequest;
 import com.example.dto.PhotoLayoutRequest;
 import com.example.model.ImageState;
-import com.example.services.CropImageService;
-import com.example.services.ResizeImageService;
-import com.example.services.BackgroundRemovalService;
-import com.example.services.BackgroundReplaceService;
-import com.example.services.FaceCenteringService;
-import com.example.services.PhotoEnhanceService;
-import com.example.services.PhotoLayoutService;
-import com.example.services.UploadImageService;
+import com.example.services.*;
+import com.example.services.memory.ImageStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +21,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api")
@@ -35,8 +30,8 @@ public class ApiController {
 
     private final ImageState state = new ImageState();
 
-    @Autowired
-    private UploadImageService uploadImageService;
+    // @Autowired
+    // private UploadImageService uploadImageService;
 
     @Autowired
     private CropImageService cropImageService;
@@ -59,29 +54,64 @@ public class ApiController {
     @Autowired
     private PhotoLayoutService photoLayoutService;
 
+    @Autowired
+    private ImageStore imageStore; // Shared image store (in memory)
+    private ImageManager imageManager; // This will hold the current storage strategy
+
+    @Autowired
+    public ApiController(DiskImageManager diskImageManager) {
+        this.imageManager = diskImageManager; // Start with DiskImageManager
+    }
+
     @PostMapping("/upload")
-    public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> upload(@RequestParam("files") MultipartFile[] files) {
+
         try {
-            BufferedImage uploadedImage = ImageIO.read(file.getInputStream());
-            state.setOriginalImage(uploadedImage);
-            state.setCurrentImage(state.cloneImage(uploadedImage));
-            // Reset background state when a new image is uploaded
-            backgroundReplaceService.resetBackgroundState();
-            // Clear any stored reference image
-            state.clearReferenceImage();
-            return ResponseEntity.ok("Image uploaded successfully");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error uploading image: " + e.getMessage());
+            for (MultipartFile file : files) {
+                BufferedImage uploadedImage = ImageIO.read(file.getInputStream());
+
+                // Store image in memory using your original DiskImageManager logic
+                imageManager.storeImage(file.getOriginalFilename(), uploadedImage);
+
+            }
+            // System.out.println("Test"+imageStore.getImageStore().keySet());
+
+            // System.out.println("---- Current Images in ImageStore ----");
+            // for (Map.Entry<String, ImageState> entry : imageStore.getImageStore().entrySet()) {
+            //     String filename = entry.getKey();
+            //     ImageState state = entry.getValue();
+            //     BufferedImage image = state != null ? state.getCurrentImage() : null;
+
+            //     System.out.println("Filename: " + filename);
+            //     System.out.println("  - Image present: " + (image != null));
+            //     if (image != null) {
+            //         System.out.println("  - Dimensions: " + image.getWidth() + "x" + image.getHeight());
+            //         System.out.println("  - ColorModel: " + image.getColorModel());
+            //     }
+            // }
+            return ResponseEntity.ok("Images uploaded successfully");
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body("Error uploading image(s): " + e.getMessage());
         }
     }
 
     @PostMapping("/crop")
-    public ResponseEntity<?> crop(@RequestBody CropRequest cropRequest) {
-        // Reset background state before cropping
+    public ResponseEntity<?> crop(@RequestParam("key") String key,@RequestBody CropRequest cropRequest) {
+        // // Reset background state before cropping
+        // backgroundReplaceService.resetBackgroundState();
+        // // Clear any stored reference image as the base image is changing
+        // state.clearReferenceImage();
+        // return cropImageService.crop(cropRequest, state);
+        System.out.println(key+" ,test,"+ cropRequest);
+        ImageState state = imageStore.getImageState(key);
+        if (state == null) {
+            return ResponseEntity.badRequest().body("No image found for key: " + key);
+        }
+
         backgroundReplaceService.resetBackgroundState();
-        // Clear any stored reference image as the base image is changing
         state.clearReferenceImage();
-        return cropImageService.crop(cropRequest, state);
+ImageState is= imageStore.getImageState(key);
+        return cropImageService.crop(cropRequest, is);
     }
 
     @PostMapping("/resize")
@@ -186,6 +216,27 @@ public class ApiController {
         return photoLayoutService.createLayout(request, state);
     }
 
+    @GetMapping("/image/all")
+    public ResponseEntity<Map<String, byte[]>> getAllImagesAsBytes() {
+        Map<String, byte[]> imageMap = new HashMap<>();
+
+        for (Map.Entry<String, ImageState> entry : imageStore.getImageStore().entrySet()) {
+            String filename = entry.getKey();
+            BufferedImage image = entry.getValue().getCurrentImage(); // ❗ potential NPE here
+
+            if (image != null) {
+                try {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    ImageIO.write(image, "png", baos); // ❗ can throw IOException
+                    imageMap.put(filename, baos.toByteArray());
+                } catch (IOException e) {
+                    e.printStackTrace(); // this shows in your logs
+                }
+            }
+        }
+
+        return ResponseEntity.ok(imageMap);
+    }
     @GetMapping("/image/get")
     public ResponseEntity<?> getCurrentImage() throws IOException {
         BufferedImage img = state.getCurrentImage();
@@ -197,6 +248,25 @@ public class ApiController {
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .body(baos.toByteArray());
+
+        // Map<String, byte[]> imageMap = new HashMap<>();
+
+        // for (Map.Entry<String, ImageState> entry : imageStore.getImageStore().entrySet()) {
+        //     String filename = entry.getKey();
+        //     BufferedImage image = entry.getValue().getCurrentImage(); // Get current image
+
+        //     if (image != null) {
+        //         try {
+        //             ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        //             ImageIO.write(image, "png", baos);
+        //             imageMap.put(filename, baos.toByteArray()); // Add byte[] value
+        //         } catch (IOException e) {
+        //             e.printStackTrace(); // Optional: log it better in production
+        //         }
+        //     }
+        // }
+
+        // return ResponseEntity.ok(imageMap);
     }
 
     @GetMapping("/image/dimensions")

@@ -10,8 +10,8 @@ import BatchEditingPage from './pages/BatchEditingPage.vue';
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: HomePage
+    name: 'LandingPage',
+    component: LandingPage
   },
   {
     path: '/drive',
@@ -19,7 +19,7 @@ const routes = [
     component: DriveExplorerPage
   },
   {
-    path: '/edit/:fileId?',
+    path: '/edit',
     name: 'EditingPage',
     component: EditingPage,
     props: true
@@ -33,7 +33,7 @@ const routes = [
 
 // Create router instance
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(process.env.BASE_URL),
   routes
 });
 

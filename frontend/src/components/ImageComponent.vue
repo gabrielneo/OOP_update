@@ -1,75 +1,37 @@
 <template>
   <div class="image-container">
     <div class="canvas">
-      <div
-        @mousedown="startDrag"
-        @mousemove="dragging"
-        @mouseup="endDrag"
-        class="image-container-inner"
-      >
-        <div ref="imageWrapper" class="image-wrapper">
-          <img
-            :src="image"
-            alt="ID Photo"
-            class="photo"
-            draggable="false"
-            ref="photoImage"
-          />
 
-          <!-- Movable crop box based on input dimensions -->
-          <div
-            v-if="
+
+
+      <div @mousedown="startDrag" @mousemove="dragging" @mouseup="endDrag" class="image-container-inner">
+        <div @wheel="handleZoom" class="zoom-container">
+          <div ref="imageWrapper" class="image-wrapper">
+            <img :src="image" alt="ID Photo" class="photo" draggable="false" ref="photoImage" />
+
+            <!-- Movable crop box based on input dimensions -->
+            <div v-if="
               activeFeature === 'crop' && cropWidthMm > 0 && cropHeightMm > 0
-            "
-            :key="`crop-${cropWidthMm}-${cropHeightMm}`"
-            class="crop-box"
-            :style="dimensionCropBoxStyle"
-            @mousedown.stop="startMoveCropBox"
-          ></div>
+            " :key="`crop-${cropWidthMm}-${cropHeightMm}`" class="crop-box" :style="dimensionCropBoxStyle"
+              @mousedown.stop="startMoveCropBox"></div>
 
-          <!-- Manual free crop box -->
-          <div v-if="cropBox" class="crop-box" :style="cropBoxStyle"></div>
+            <!-- Manual free crop box -->
+            <div v-if="cropBox" class="crop-box" :style="cropBoxStyle"></div>
 
-          <!-- Resize box with handles -->
-          <div
-            v-if="activeFeature === 'resize' && resizeBox"
-            class="resize-box"
-            :style="resizeBoxStyle"
-          >
-            <!-- Resize handles on corners and edges -->
-            <div
-              class="resize-handle top-left"
-              @mousedown.stop="startResize('top-left')"
-            ></div>
-            <div
-              class="resize-handle top"
-              @mousedown.stop="startResize('top')"
-            ></div>
-            <div
-              class="resize-handle top-right"
-              @mousedown.stop="startResize('top-right')"
-            ></div>
-            <div
-              class="resize-handle right"
-              @mousedown.stop="startResize('right')"
-            ></div>
-            <div
-              class="resize-handle bottom-right"
-              @mousedown.stop="startResize('bottom-right')"
-            ></div>
-            <div
-              class="resize-handle bottom"
-              @mousedown.stop="startResize('bottom')"
-            ></div>
-            <div
-              class="resize-handle bottom-left"
-              @mousedown.stop="startResize('bottom-left')"
-            ></div>
-            <div
-              class="resize-handle left"
-              @mousedown.stop="startResize('left')"
-            ></div>
+            <!-- Resize box with handles -->
+            <div v-if="activeFeature === 'resize' && resizeBox" class="resize-box" :style="resizeBoxStyle">
+              <!-- Resize handles on corners and edges -->
+              <div class="resize-handle top-left" @mousedown.stop="startResize('top-left')"></div>
+              <div class="resize-handle top" @mousedown.stop="startResize('top')"></div>
+              <div class="resize-handle top-right" @mousedown.stop="startResize('top-right')"></div>
+              <div class="resize-handle right" @mousedown.stop="startResize('right')"></div>
+              <div class="resize-handle bottom-right" @mousedown.stop="startResize('bottom-right')"></div>
+              <div class="resize-handle bottom" @mousedown.stop="startResize('bottom')"></div>
+              <div class="resize-handle bottom-left" @mousedown.stop="startResize('bottom-left')"></div>
+              <div class="resize-handle left" @mousedown.stop="startResize('left')"></div>
+            </div>
           </div>
+
         </div>
       </div>
     </div>
@@ -147,6 +109,7 @@ export default {
       resizeEmitTimeout: null,
       // For cleanup
       faceDetectionTimeout: null,
+      scale: 1,
     };
   },
   computed: {
@@ -266,6 +229,38 @@ export default {
     },
   },
   methods: {
+    // Handle the zoom event (Ctrl + Scroll)
+    handleZoom(event) {
+      // Only zoom when the Ctrl key is pressed
+      if (event.ctrlKey) {
+        event.preventDefault(); // Prevent the default browser zoom
+
+        // Calculate the zoom factor (zoom in or out)
+        const delta = event.deltaY || event.detail || event.wheelDelta;
+        const zoomFactor = delta < 0 ? 1.1 : 0.9; // Zoom in when scrolling up, zoom out when scrolling down
+
+        // Update the scale (zoom level)
+        this.scale *= zoomFactor;
+
+        // Limit zoom level to avoid extreme zoom
+        this.scale = Math.min(Math.max(this.scale, 0.5), 3);
+
+        // Call zoomImage function to zoom into the mouse position
+        this.zoomImage(event);
+      }
+    },
+    // Zoom the image based on the mouse position
+    zoomImage(event) {
+      const imageWrapper = this.$refs.imageWrapper;
+      const rect = imageWrapper.getBoundingClientRect(); // Get image wrapper dimensions
+      const offsetX = event.clientX - rect.left; // X offset of mouse
+      const offsetY = event.clientY - rect.top; // Y offset of mouse
+
+      // Set the zoom origin based on mouse position
+      imageWrapper.style.transformOrigin = `${(offsetX / rect.width) * 100}% ${(offsetY / rect.height) * 100}%`;
+      imageWrapper.style.transform = `scale(${this.scale})`; // Apply zoom
+    },
+
     centerCropBox() {
       if (this.activeFeature !== "crop") return;
       if (!this.cropWidthMm || !this.cropHeightMm) return;
@@ -381,12 +376,12 @@ export default {
         Math.floor(displayHeightPx * ratioY)
       );
 
-      console.log(
-        `Emitting crop area: x=${cropNaturalX}, y=${cropNaturalY}, width=${cropNaturalWidth}, height=${cropNaturalHeight}`
-      );
-      console.log(
-        `Original image dimensions: ${imgNaturalWidth}x${imgNaturalHeight}, Display: ${displayWidth}x${displayHeight}`
-      );
+      // console.log(
+      //   `Emitting crop area: x=${cropNaturalX}, y=${cropNaturalY}, width=${cropNaturalWidth}, height=${cropNaturalHeight}`
+      // );
+      // console.log(
+      //   `Original image dimensions: ${imgNaturalWidth}x${imgNaturalHeight}, Display: ${displayWidth}x${displayHeight}`
+      // );
 
       this.$emit("crop-area", {
         x: cropNaturalX,
@@ -513,8 +508,7 @@ export default {
       // Determine if the image is portrait or landscape
       const isPortrait = rect.height > rect.width;
       console.log(
-        `Image orientation: ${
-          isPortrait ? "Portrait" : "Landscape"
+        `Image orientation: ${isPortrait ? "Portrait" : "Landscape"
         }, dimensions: ${rect.width}x${rect.height}`
       );
 
@@ -702,7 +696,7 @@ export default {
           const connectingLine = document.createElement("div");
           const lineLength = Math.sqrt(
             Math.pow(faceCenterX - imageCenterX, 2) +
-              Math.pow(faceCenterY - imageCenterY, 2)
+            Math.pow(faceCenterY - imageCenterY, 2)
           );
           const angle =
             Math.atan2(imageCenterY - faceCenterY, imageCenterX - faceCenterX) *

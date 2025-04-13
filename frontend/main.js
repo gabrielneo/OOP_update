@@ -1,3 +1,4 @@
+
 const { app, BrowserWindow, Menu } = require("electron");
 const path = require("path");
 
@@ -11,8 +12,8 @@ app.whenReady().then(() => {
             contextIsolation: true,
             enableRemoteModule: false,
             preload: path.join(__dirname, "preload.js"), // Add preload script
-            nodeIntegration: true,
-            zoomFactor:1.0
+            nodeIntegration: false,
+            zoomFactor: 1.0
         }
     });
 
