@@ -292,22 +292,6 @@
               />
               <label for="useAltDetector">Use alternative detector</label>
             </div>
-            <div class="option-item">
-              <input
-                type="checkbox"
-                id="useProfileDetector"
-                v-model="useProfileDetector"
-              />
-              <label for="useProfileDetector">Detect profile faces</label>
-            </div>
-            <div class="option-item">
-              <input
-                type="checkbox"
-                id="detectMultipleFaces"
-                v-model="detectMultipleFaces"
-              />
-              <label for="detectMultipleFaces">Detect multiple faces</label>
-            </div>
           </div>
         </div>
       </div>
@@ -555,8 +539,6 @@ export default {
       selectedBackgroundImage: null,
       backgroundImageFile: null,
       useAltDetector: false,
-      useProfileDetector: false,
-      detectMultipleFaces: false,
       previewBrightness: 0,
       previewContrast: 0,
       brightness: 0,
@@ -707,14 +689,10 @@ export default {
         show: true,
         options: {
           useAltDetector: this.useAltDetector,
-          useProfileDetector: this.useProfileDetector,
-          detectMultipleFaces: this.detectMultipleFaces,
         },
       });
       console.log("Face detection requested with options:", {
         useAltDetector: this.useAltDetector,
-        useProfileDetector: this.useProfileDetector,
-        detectMultipleFaces: this.detectMultipleFaces,
       });
     },
     setClothingType(type) {
@@ -736,8 +714,6 @@ export default {
         this.backgroundImageFile = null;
       } else if (this.feature === "face") {
         this.useAltDetector = false;
-        this.useProfileDetector = false;
-        this.detectMultipleFaces = false;
       } else if (this.feature === "enhance") {
         // Only reset the values that have been changed
         if (this.previewBrightness !== 0) {
@@ -831,17 +807,11 @@ export default {
           console.error("No background color or image selected");
           return;
         }
-      } else if (this.feature === "clothes") {
-        changes = {
-          type: "clothes",
-        };
       } else if (this.feature === "face") {
         this.$emit("faceDetectionChange", {
           show: true,
           options: {
             useAltDetector: this.useAltDetector,
-            useProfileDetector: this.useProfileDetector,
-            detectMultipleFaces: this.detectMultipleFaces,
           },
         });
         return;
