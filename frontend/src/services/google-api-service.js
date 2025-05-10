@@ -254,6 +254,46 @@ export const fixTokens = async () => {
   }
 };
 
+/**
+ * Force a completely fresh login by clearing all credentials
+ * and requiring the user to select a Google account again
+ */
+export const forceNewLogin = async () => {
+  try {
+    console.log('Forcing completely new Google login...');
+    
+    // This endpoint completely wipes credentials and returns a special auth URL
+    const response = await fetch("/api/auth/force-new-login", {
+      method: 'GET',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error("Failed to initiate forced new login");
+    }
+    
+    const data = await response.json();
+    
+    if (!data.url) {
+      throw new Error("Invalid authorization URL response");
+    }
+    
+    console.log('Redirecting to fresh Google auth URL with force approval');
+    localStorage.setItem('force_login_attempt', 'true');
+    
+    // Redirect to Google's auth page with forced approval
+    window.location.href = data.url;
+    
+    return true;
+  } catch (error) {
+    console.error('Error during forced new login:', error);
+    throw error;
+  }
+};
+
 export default {
   checkLoginStatus,
   signIn,
@@ -262,5 +302,6 @@ export default {
   listDriveFiles,
   getFileContent,
   getFileDetails,
-  fixTokens
+  fixTokens,
+  forceNewLogin
 }; 

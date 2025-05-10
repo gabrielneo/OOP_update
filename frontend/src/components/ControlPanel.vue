@@ -31,7 +31,7 @@
           </div>
         </div>
         <div class="control-item">
-          <label>Size (mm)</label>
+          <label>Current Crop ratio</label>
           <div class="size-inputs">
             <input
               type="number"
@@ -41,6 +41,8 @@
               :disabled="selectedRatio !== 'custom'"
               class="size-input"
               :class="{ disabled: selectedRatio !== 'custom' }"
+              step="0.1"
+              min="0.1"
             />
             ×
             <input
@@ -51,19 +53,21 @@
               :disabled="selectedRatio !== 'custom'"
               class="size-input"
               :class="{ disabled: selectedRatio !== 'custom' }"
+              step="0.1"
+              min="0.1"
             />
           </div>
-          <button
+          <!-- <button
             class="action-btn apply-dimensions-btn"
             @click="applyDimensions"
           >
             Apply Dimensions
-          </button>
+          </button> -->
         </div>
         <div class="control-actions">
-          <button class="action-btn" @click="applyChanges">Apply</button>
+          <button class="action-btn" @click="applyChanges">Crop</button>
           <button class="action-btn secondary" @click="resetControls">
-            Reset
+            Reset inputs
           </button>
         </div>
       </div>
@@ -72,10 +76,38 @@
       <div v-if="feature === 'resize'" class="control-group">
         <div class="control-item">
           <label>Current Dimensions:</label>
-          <div class="size-display" v-if="imageDimensions">
-            {{ imageDimensions.width }}px × {{ imageDimensions.height }}px
+          <div class="size-display" v-if="imageDimensions" style="color: white;">
+            {{ Math.round(imageDimensions.width * 0.264583) }}mm ×
+            {{ Math.round(imageDimensions.height * 0.264583) }}mm
+            ({{ imageDimensions.width }}px × {{ imageDimensions.height }}px)
           </div>
         </div>
+        
+        <!-- Dimensions in millimeters -->
+        <div class="control-item">
+          <label>New Dimensions (mm):</label>
+          <div class="size-inputs ">
+            <input
+              type="number"
+              v-model.number="resizeWidthMm"
+              @change="calculateHeightFromWidthMm"
+              class="size-input"
+              min="1"
+              step="1"
+            />
+            <span style="color: rgb(74, 144, 226);">×</span>
+            <input
+              type="number"
+              v-model.number="resizeHeightMm"
+              @change="calculateWidthFromHeightMm"
+              class="size-input"
+              min="1"
+              step="1"
+            />
+          </div>
+        </div>
+        
+        <!-- Dimensions in pixels -->
         <div class="control-item">
           <label>New Dimensions (px):</label>
           <div class="size-inputs">
@@ -85,19 +117,48 @@
               @change="calculateHeightFromWidth"
               class="size-input"
               min="1"
+              step="1"
             />
-            ×
+            <span style="color: rgb(74, 144, 226);">×</span>
             <input
               type="number"
               v-model.number="resizeHeight"
               @change="calculateWidthFromHeight"
               class="size-input"
               min="1"
+              step="1"
             />
           </div>
-          <div class="aspect-ratio-info">
+        </div>
+        
+        <!-- Options -->
+        <div class="control-item">
+          <div class="resize-options">
+            <div class="option-item">
+              <input
+                type="checkbox"
+                id="maintainAspectRatio"
+                v-model="maintainAspectRatio"
+              />
+              <label for="maintainAspectRatio">Maintain aspect ratio</label>
+            </div>
+            <div class="option-item">
+              <input
+                type="checkbox"
+                id="useExactDimensions"
+                v-model="useExactDimensions"
+              />
+              <label for="useExactDimensions">Use exact dimensions</label>
+            </div>
+            
+            <div class="preset-buttons" v-if="useExactDimensions">
+              <button class="preset-btn" @click="setComplianceDimensions">Set to 400×514 px</button>
+            </div>
+          </div>
+          
+          <div class="aspect-ratio-info" v-if="maintainAspectRatio && !useExactDimensions">
             <i-lucide-lock class="lock-icon" />
-            <span>Aspect ratio maintained</span>
+            <span>Current aspect ratio maintained. <br> Use 'Crop' tool to change aspect ratio</span>
           </div>
           <div class="resize-tip">
             <i-lucide-info class="info-icon" />
@@ -109,7 +170,7 @@
         </div>
         <div class="control-actions">
           <button class="action-btn primary" @click="applyChanges">
-            Apply Resize
+            Resize
           </button>
           <button class="action-btn secondary" @click="resetResizeControls">
             Reset
@@ -123,24 +184,21 @@
           <label>Removal Method</label>
           <div class="method-options">
             <button
-              :class="['control-btn', { active: removalMethod === 'auto' }]"
+              :class="['upload-bg-btn', { active: removalMethod === 'auto' }]"
               @click="setRemovalMethod('auto')"
             >
-              Automatic
+              Automatic Mode (selected)
             </button>
-            <button
+            <!-- <button
               :class="['control-btn', { active: removalMethod === 'manual' }]"
               @click="setRemovalMethod('manual')"
             >
               Manual Selection
-            </button>
+            </button> -->
           </div>
         </div>
         <div class="control-actions">
-          <button class="action-btn" @click="applyChanges">Apply</button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
+          <button class="action-btn" @click="applyChanges">Remove Background</button>
         </div>
       </div>
 
@@ -184,49 +242,48 @@
         </div>
         <div class="control-actions">
           <button class="action-btn" @click="applyChanges">Apply</button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
         </div>
       </div>
 
       <!-- Clothes replacement controls -->
       <div v-if="feature === 'clothes'" class="control-group">
-        <div class="control-item">
-          <label>Select Clothing Template</label>
-          <div class="template-options">
-            <div class="template-option">
-              <!-- <img src="/placeholder.svg?height=60&width=60" alt="Formal Suit" /> -->
-              <span>Formal Suit</span>
-            </div>
-            <div class="template-option">
-              <!-- <img src="/placeholder.svg?height=60&width=60" alt="Business Casual" /> -->
-              <span>Business Casual</span>
-            </div>
-            <div class="template-option">
-              <!-- <img src="/placeholder.svg?height=60&width=60" alt="Formal Dress" /> -->
-              <span>Formal Dress</span>
-            </div>
+      <div class="control-item">
+        <label>Select Clothing Template</label>
+        <div class="template-options">
+          <div 
+            class="template-option" 
+            :class="{ active: selectedClothingType === 'male' }"
+            @click="setClothingType('male')"
+          >
+            <img src='/assets/MaleSuit.png' alt=''>
+            <span style="color: white;">Formal Suit</span>
+            <span style="color: white;">(Male)</span>
+          </div>
+          <div 
+            class="template-option" 
+            :class="{ active: selectedClothingType === 'female' }"
+            @click="setClothingType('female')"
+          >
+          <img src='/assets/FemaleSuit.png' alt=''>
+          <span style="color: white;">Formal Suit</span>
+          <span style="color: white;">(Female)</span>
           </div>
         </div>
-        <div class="control-actions">
-          <button class="action-btn" @click="applyChanges">Apply</button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
-          </button>
-        </div>
       </div>
+      <div class="control-actions">
+        <button class="action-btn" @click="applyChanges">Apply</button>
+      </div>
+    </div>
 
       <!-- Face centering controls -->
       <div v-if="feature === 'face'" class="control-group">
-        <h3>Face Detection & Centering</h3>
         <div class="control-item mt-3">
-          <button class="primary-button w-full mb-2" @click="detectFace">
+          <button class="action-btn w-full mb-2" @click="detectFace">
             Detect & Center Face
           </button>
 
           <div class="detection-options mt-3">
-            <h4 class="text-sm font-semibold mb-2">Advanced Options</h4>
+            <h4 class="text-sm font-semibold mb-2" style="color: white;">Advanced Options</h4>
             <div class="option-item">
               <input
                 type="checkbox"
@@ -234,22 +291,6 @@
                 v-model="useAltDetector"
               />
               <label for="useAltDetector">Use alternative detector</label>
-            </div>
-            <div class="option-item">
-              <input
-                type="checkbox"
-                id="useProfileDetector"
-                v-model="useProfileDetector"
-              />
-              <label for="useProfileDetector">Detect profile faces</label>
-            </div>
-            <div class="option-item">
-              <input
-                type="checkbox"
-                id="detectMultipleFaces"
-                v-model="detectMultipleFaces"
-              />
-              <label for="detectMultipleFaces">Detect multiple faces</label>
             </div>
           </div>
         </div>
@@ -259,21 +300,8 @@
       <div v-if="feature === 'layout'" class="control-group">
         <div class="control-item">
           <label>Current Image Dimensions:</label>
-          <div class="size-display" v-if="imageDimensions">
+          <div class="size-display" v-if="imageDimensions" style="color: white;">
             {{ imageDimensions.width }}px × {{ imageDimensions.height }}px
-          </div>
-        </div>
-        <div class="control-item">
-          <label>Border Size (mm):</label>
-          <div class="size-inputs">
-            <input
-              type="number"
-              v-model.number="borderSize"
-              class="size-input"
-              min="0"
-              max="20"
-              @change="calculateLayoutDimensions"
-            />
           </div>
         </div>
         <div class="control-item">
@@ -341,14 +369,7 @@
               </div>
             </div>
             <div class="layout-info">
-              <p v-if="borderSize === 0">
-                No border will be applied to the images.
-              </p>
-              <p v-else>
-                Original with border: {{ originalWithBorderWidth }}mm ×
-                {{ originalWithBorderHeight }}mm
-              </p>
-              <p>Final layout size: {{ finalWidth }}mm × {{ finalHeight }}mm</p>
+              <p style="color: white;">Final layout size: {{ finalWidth }}mm × {{ finalHeight }}mm</p>
             </div>
           </div>
         </div>
@@ -360,9 +381,6 @@
             :disabled="!selectedLayout"
           >
             Apply
-          </button>
-          <button class="action-btn secondary" @click="resetControls">
-            Reset
           </button>
         </div>
       </div>
@@ -378,7 +396,7 @@
             v-model="previewBrightness"
             class="slider-input"
           />
-          <span class="slider-value">{{ previewBrightness }}</span>
+          <span class="slider-value" style="color: rgb(74, 144, 226)">{{ previewBrightness }}</span>
         </div>
         <div class="control-item slider">
           <label>Contrast</label>
@@ -389,7 +407,7 @@
             v-model="previewContrast"
             class="slider-input"
           />
-          <span class="slider-value">{{ previewContrast }}</span>
+          <span style="color: rgb(74, 144, 226)" class="slider-value">{{ previewContrast }}</span>
         </div>
         <div class="enhancement-info" v-if="enhancementActive">
           <div class="info-text">
@@ -404,11 +422,45 @@
           </button>
         </div>
       </div>
+
+      <!-- Compliance Check controls -->
+      <div v-if="feature === 'compliance-check'" class="control-group">
+        <div class="control-item">
+          <p class="helper-text">Check if your photo meets the standard ID photo requirements.</p>
+          
+          <div v-if="complianceCheck.loading" class="compliance-loading">
+            <div class="spinner"></div>
+            <p>Checking compliance...</p>
+          </div>
+          
+          <div v-else-if="complianceCheck.result" class="compliance-results">
+            <div class="compliance-status" :class="{ 'compliant': complianceCheck.result.compliant, 'non-compliant': !complianceCheck.result.compliant }">
+              <div class="status-icon">
+                <span v-if="complianceCheck.result.compliant">✓</span>
+                <span v-else>!</span>
+              </div>
+              <h4>{{ complianceCheck.result.message }}</h4>
+            </div>
+            
+            <div v-if="!complianceCheck.result.compliant && complianceCheck.result.issues && complianceCheck.result.issues.length > 0" class="error-messages">
+              <div v-for="(issue, index) in complianceCheck.result.issues" :key="index" class="error-message">
+                {{ issue }}
+              </div>
+            </div>
+          </div>
+          
+          <button class="action-btn primary" @click="checkCompliance" style="margin-top: 20px;">
+            Check Again
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+import ComplianceService from '../services/compliance-service';
+
 export default {
   props: {
     feature: {
@@ -425,6 +477,10 @@ export default {
     },
     imageDimensions: {
       type: Object,
+      default: null,
+    },
+    image: {
+      type: String,
       default: null,
     },
   },
@@ -446,7 +502,11 @@ export default {
       // Resize state
       resizeWidth: 0,
       resizeHeight: 0,
+      resizeWidthMm: 0,
+      resizeHeightMm: 0,
       originalAspectRatio: 1,
+      maintainAspectRatio: true,
+      useExactDimensions: false,
 
       // Background removal state
       removalMethod: "auto",
@@ -459,8 +519,6 @@ export default {
       selectedBackgroundImage: null,
       backgroundImageFile: null,
       useAltDetector: false,
-      useProfileDetector: false,
-      detectMultipleFaces: false,
       previewBrightness: 0,
       previewContrast: 0,
       brightness: 0,
@@ -487,6 +545,14 @@ export default {
       customCols: 2,
       originalWithBorderWidth: 0,
       originalWithBorderHeight: 0,
+
+      // clothes
+      selectedClothingType: "formal",
+
+      complianceCheck: {
+        loading: false,
+        result: null
+      },
     };
   },
   watch: {
@@ -508,6 +574,8 @@ export default {
         if (val) {
           this.resizeWidth = val.width;
           this.resizeHeight = val.height;
+          this.resizeWidthMm = Math.round(val.width * 0.264583);
+          this.resizeHeightMm = Math.round(val.height * 0.264583);
           this.originalAspectRatio = val.width / val.height;
         }
       },
@@ -544,16 +612,19 @@ export default {
   },
   methods: {
     applyDimensions() {
-      const width = Math.max(1, parseInt(this.localCropWidth) || 35);
-      const height = Math.max(1, parseInt(this.localCropHeight) || 45);
+      const width = Math.max(0.1, parseFloat(this.localCropWidth) || 35);
+      const height = Math.max(0.1, parseFloat(this.localCropHeight) || 45);
 
-      this.localCropWidth = width;
-      this.localCropHeight = height;
+      this.localCropWidth = parseFloat(width.toFixed(1)); // Keep one decimal place
+      this.localCropHeight = parseFloat(height.toFixed(1)); // Keep one decimal place
 
-      this.$emit("update:cropWidth", width);
-      this.$emit("update:cropHeight", height);
+      this.$emit("update:cropWidth", this.localCropWidth);
+      this.$emit("update:cropHeight", this.localCropHeight);
 
-      this.$emit("apply-dimensions", { width, height });
+      this.$emit("apply-dimensions", {
+        width: this.localCropWidth,
+        height: this.localCropHeight,
+      });
     },
     getFeatureTitle(feature) {
       const titles = {
@@ -565,6 +636,8 @@ export default {
         face: "Face Centering",
         enhance: "Enhance",
         layout: "Layout",
+        "compliance-check": "Compliance Check",
+        "ai-optimize": "AI Optimization"
       };
       return titles[feature] || "Edit Photo";
     },
@@ -572,8 +645,8 @@ export default {
       this.selectedRatio = ratio;
       if (ratio !== "custom") {
         const [width, height] = ratio.split(":");
-        const parsedWidth = parseInt(width);
-        const parsedHeight = parseInt(height);
+        const parsedWidth = parseFloat(width);
+        const parsedHeight = parseFloat(height);
 
         this.localCropWidth = parsedWidth;
         this.localCropHeight = parsedHeight;
@@ -596,15 +669,14 @@ export default {
         show: true,
         options: {
           useAltDetector: this.useAltDetector,
-          useProfileDetector: this.useProfileDetector,
-          detectMultipleFaces: this.detectMultipleFaces,
         },
       });
       console.log("Face detection requested with options:", {
         useAltDetector: this.useAltDetector,
-        useProfileDetector: this.useProfileDetector,
-        detectMultipleFaces: this.detectMultipleFaces,
       });
+    },
+    setClothingType(type) {
+      this.selectedClothingType = type;
     },
     resetControls() {
       if (this.feature === "crop") {
@@ -622,25 +694,25 @@ export default {
         this.backgroundImageFile = null;
       } else if (this.feature === "face") {
         this.useAltDetector = false;
-        this.useProfileDetector = false;
-        this.detectMultipleFaces = false;
       } else if (this.feature === "enhance") {
-        this.previewBrightness = 0;
-        this.previewContrast = 0;
-        this.brightness = 0;
-        this.contrast = 0;
-        this.enhancementActive = false;
-        this.isFirstAdjustment = true;
+        // Only reset the values that have been changed
+        if (this.previewBrightness !== 0) {
+          this.previewBrightness = 0;
+          this.brightness = 0;
+        }
+        if (this.previewContrast !== 0) {
+          this.previewContrast = 0;
+          this.contrast = 0;
+        }
 
         // When resetting, send a reset request to clear any enhancements
         this.$emit("enhancement-preview", {
-          brightness: 0,
-          contrast: 0,
+          brightness: this.previewBrightness,
+          contrast: this.previewContrast,
           firstAdjustment: true,
           previewInProgress: false,
         });
       } else if (this.feature === "layout") {
-        this.borderSize = 5;
         this.selectedLayout = null;
         this.customRows = 2;
         this.customCols = 2;
@@ -665,17 +737,25 @@ export default {
           type: "resize",
           width: this.resizeWidth,
           height: this.resizeHeight,
-          maintainAspectRatio: true,
+          maintainAspectRatio: !this.useExactDimensions && this.maintainAspectRatio,
           widthProvided: true,
           heightProvided: true,
+          useExactDimensions: this.useExactDimensions
         };
 
         console.log(
           "Sending resize request with dimensions:",
           this.resizeWidth,
           "x",
-          this.resizeHeight
+          this.resizeHeight,
+          "useExactDimensions:",
+          this.useExactDimensions
         );
+      } else if (this.feature === "clothes") {
+        changes = {
+          type: "clothes",
+          clothingType: this.selectedClothingType,
+        };
       } else if (this.feature === "background-remove") {
         changes = {
           type: "background-remove",
@@ -706,17 +786,11 @@ export default {
           console.error("No background color or image selected");
           return;
         }
-      } else if (this.feature === "clothes") {
-        changes = {
-          type: "clothes",
-        };
       } else if (this.feature === "face") {
         this.$emit("faceDetectionChange", {
           show: true,
           options: {
             useAltDetector: this.useAltDetector,
-            useProfileDetector: this.useProfileDetector,
-            detectMultipleFaces: this.detectMultipleFaces,
           },
         });
         return;
@@ -754,7 +828,7 @@ export default {
           originalHeight: this.originalWithBorderHeight,
           finalWidth: this.finalWidth,
           finalHeight: this.finalHeight,
-          useOriginalImage: true, // Explicitly tell backend to use original image
+          useOriginalImage: true,
         };
 
         // Reset selections after applying to prevent recursive layouts
@@ -767,43 +841,85 @@ export default {
       this.$emit("apply-changes", changes);
     },
     updateWidth(event) {
-      const value = parseInt(event.target.value) || 1;
+      const value = parseFloat(event.target.value) || 1;
       this.localCropWidth = value;
     },
     updateHeight(event) {
-      const value = parseInt(event.target.value) || 1;
+      const value = parseFloat(event.target.value) || 1;
       this.localCropHeight = value;
     },
     applyWidth() {
-      const value = Math.max(1, this.localCropWidth);
-      this.localCropWidth = value;
-      this.$emit("update:cropWidth", value);
+      const value = Math.max(0.1, this.localCropWidth);
+      this.localCropWidth = parseFloat(value.toFixed(1)); // Keep one decimal place
+      this.$emit("update:cropWidth", this.localCropWidth);
     },
     applyHeight() {
-      const value = Math.max(1, this.localCropHeight);
-      this.localCropHeight = value;
-      this.$emit("update:cropHeight", value);
+      const value = Math.max(0.1, this.localCropHeight);
+      this.localCropHeight = parseFloat(value.toFixed(1)); // Keep one decimal place
+      this.$emit("update:cropHeight", this.localCropHeight);
     },
-    calculateHeightFromWidth() {
-      if (this.originalAspectRatio && this.resizeWidth > 0) {
-        this.resizeHeight = Math.round(
-          this.resizeWidth / this.originalAspectRatio
+    calculateHeightFromWidthMm() {
+      if (this.originalAspectRatio && this.resizeWidthMm > 0) {
+        this.resizeHeightMm = Math.round(
+          this.resizeWidthMm / this.originalAspectRatio
         );
+        // Convert back to pixels for the actual resize operation
+        this.resizeWidth = Math.round(this.resizeWidthMm / 0.264583);
+        this.resizeHeight = Math.round(this.resizeHeightMm / 0.264583);
       }
     },
 
-    calculateWidthFromHeight() {
-      if (this.originalAspectRatio && this.resizeHeight > 0) {
-        this.resizeWidth = Math.round(
-          this.resizeHeight * this.originalAspectRatio
+    calculateWidthFromHeightMm() {
+      if (this.originalAspectRatio && this.resizeHeightMm > 0) {
+        this.resizeWidthMm = Math.round(
+          this.resizeHeightMm * this.originalAspectRatio
         );
+        // Convert back to pixels for the actual resize operation
+        this.resizeWidth = Math.round(this.resizeWidthMm / 0.264583);
+        this.resizeHeight = Math.round(this.resizeHeightMm / 0.264583);
       }
+    },
+    
+    calculateHeightFromWidth() {
+      if (this.maintainAspectRatio && this.originalAspectRatio && this.resizeWidth > 0) {
+        this.resizeHeight = Math.round(this.resizeWidth / this.originalAspectRatio);
+        // Update mm values
+        this.resizeWidthMm = Math.round(this.resizeWidth * 0.264583);
+        this.resizeHeightMm = Math.round(this.resizeHeight * 0.264583);
+      }
+    },
+    
+    calculateWidthFromHeight() {
+      if (this.maintainAspectRatio && this.originalAspectRatio && this.resizeHeight > 0) {
+        this.resizeWidth = Math.round(this.resizeHeight * this.originalAspectRatio);
+        // Update mm values
+        this.resizeWidthMm = Math.round(this.resizeWidth * 0.264583);
+        this.resizeHeightMm = Math.round(this.resizeHeight * 0.264583);
+      }
+    },
+    
+    setComplianceDimensions() {
+      // Set to standard compliance dimensions (400x514 pixels)
+      this.resizeWidth = 400;
+      this.resizeHeight = 514;
+      // Update mm values
+      this.resizeWidthMm = Math.round(this.resizeWidth * 0.264583);
+      this.resizeHeightMm = Math.round(this.resizeHeight * 0.264583);
     },
 
     resetResizeControls() {
       if (this.imageDimensions) {
         this.resizeWidth = this.imageDimensions.width;
         this.resizeHeight = this.imageDimensions.height;
+        this.resizeWidthMm = Math.round(this.imageDimensions.width * 0.264583);
+        this.resizeHeightMm = Math.round(
+          this.imageDimensions.height * 0.264583
+        );
+        this.maintainAspectRatio = true;
+        this.useExactDimensions = false;
+        
+        // Emit a custom event to reset the resize mask in the image component
+        this.$emit("reset-resize-mask");
       }
     },
     async uploadBackgroundImage(event) {
@@ -948,7 +1064,7 @@ export default {
           originalHeightMm = Math.round(this.imageDimensions.height * pxToMm);
         }
 
-        // Calculate dimensions with border
+        // Calculate dimensions with fixed border (5mm)
         this.originalWithBorderWidth = originalWidthMm + this.borderSize * 2;
         this.originalWithBorderHeight = originalHeightMm + this.borderSize * 2;
 
@@ -993,6 +1109,82 @@ export default {
       this.resetLayoutCalculations();
       await this.calculateLayoutDimensions();
     },
+    async checkCompliance() {
+      console.log("Starting compliance check");
+      this.complianceCheck.loading = true;
+      this.complianceCheck.result = null;
+      
+      try {
+        // Check if image is available
+        if (!this.image) {
+          // If no image prop, emit an event to request the current image
+          console.log("No image available, requesting from parent component");
+          this.$emit('request-image-for-compliance');
+          
+          // Add a delay to allow the parent component to provide the image
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // If still no image, show error
+          if (!this.image) {
+            console.error("No image is currently loaded");
+            this.complianceCheck.result = {
+              compliant: false,
+              issues: ['No image is currently loaded. Please load an image first.'],
+              message: 'No image to check'
+            };
+            this.complianceCheck.loading = false;
+            return;
+          }
+        }
+        
+        console.log("Processing image for compliance check:", 
+          typeof this.image === 'string' 
+            ? `String (${this.image.substring(0, 30)}...)` 
+            : `Blob (${this.image instanceof Blob ? this.image.size + ' bytes' : 'not a blob'})`
+        );
+        
+        // Process the image (handles both blob URLs and base64 strings)
+        const imageBlob = await ComplianceService.processImageForCompliance(this.image);
+        
+        if (!imageBlob) {
+          console.error("Failed to process image");
+          this.complianceCheck.result = {
+            compliant: false,
+            issues: ['Could not process image data. The image may be invalid or corrupted.'],
+            message: 'Image processing error'
+          };
+          this.complianceCheck.loading = false;
+          return;
+        }
+        
+        console.log("Image processed successfully, size:", imageBlob.size, "bytes, type:", imageBlob.type);
+        
+        // Get background status from Vue store or local state
+        // If selectedBgColor or backgroundImageFile exists, background was replaced
+        const hasReplacedBackground = !!this.selectedBgColor || !!this.backgroundImageFile;
+        
+        // Send to compliance service with background information
+        const result = await ComplianceService.checkImageCompliance(imageBlob, {
+          hasReplacedBackground,
+          backgroundColor: this.selectedBgColor
+        });
+        
+        console.log("Received compliance result:", result);
+        
+        // Update the result
+        this.complianceCheck.result = result;
+      } catch (error) {
+        console.error('Error during compliance check:', error);
+        this.complianceCheck.result = {
+          compliant: false,
+          issues: [(error.message || 'An unexpected error occurred during compliance check')],
+          message: 'Compliance check failed'
+        };
+      } finally {
+        console.log("Compliance check complete");
+        this.complianceCheck.loading = false;
+      }
+    },
   },
 };
 </script>
@@ -1005,10 +1197,11 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin-left: 0;
 }
 
 .panel-header {
-  padding: 15px;
+  padding: 15px 15px 15px 10px;
   border-bottom: 1px solid #3a3f45;
   display: flex;
   align-items: center;
@@ -1026,6 +1219,7 @@ export default {
   justify-content: center;
   cursor: pointer;
   margin-right: 10px;
+  flex-shrink: 0;
 }
 
 .close-btn:hover {
@@ -1034,6 +1228,7 @@ export default {
 }
 
 .panel-header h3 {
+  color: rgb(74, 144, 226);
   margin: 0;
   font-size: 16px;
   font-weight: 500;
@@ -1042,13 +1237,14 @@ export default {
 .panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 15px;
+  padding: 15px 15px 15px 0;
 }
 
 .control-group {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  padding-left: 15px;
 }
 
 .control-item {
@@ -1090,6 +1286,7 @@ export default {
 .size-inputs {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -1206,6 +1403,7 @@ export default {
 }
 
 .template-option span {
+  color: rgb(74, 144, 226);
   font-size: 12px;
   text-align: center;
 }
@@ -1462,5 +1660,146 @@ export default {
 
 .primary:hover {
   background-color: #0069d9;
+}
+
+.template-option.active {
+  border: 2px solid #4a90e2;
+  background-color: rgba(74, 144, 226, 0.2);
+}
+
+.compliance-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.compliance-results {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #3a3f45;
+  border-radius: 6px;
+}
+
+.compliance-status {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+.compliant {
+  background-color: rgba(46, 204, 113, 0.1);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.non-compliant {
+  background-color: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.status-icon {
+  margin-right: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.compliant .status-icon {
+  background-color: rgba(46, 204, 113, 0.2);
+  color: #27ae60;
+}
+
+.non-compliant .status-icon {
+  background-color: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+}
+
+.compliance-status h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.compliant h4 {
+  color: #27ae60;
+}
+
+.non-compliant h4 {
+  color: #e74c3c;
+}
+
+.error-messages {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.error-message {
+  padding: 12px 16px;
+  background-color: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 4px;
+  color: #e74c3c;
+  font-size: 15px;
+}
+
+.resize-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-item label {
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.preset-buttons {
+  margin-top: 8px;
+}
+
+.preset-btn {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.preset-btn:hover {
+  background-color: #3a80d2;
 }
 </style>

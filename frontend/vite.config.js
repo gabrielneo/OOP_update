@@ -9,6 +9,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
     proxy: {
       "/auth": {
         target: "http://localhost:8080",
@@ -32,6 +33,8 @@ export default defineConfig({
         secure: false
       },
     },
-    strictPort: true, // Don't try other ports if 5173 is taken
+    hmr: {
+      overlay: false
+    }
   },
 });

@@ -1,20 +1,55 @@
 <template>
-  <div class="header">
-    <div class="left-menu">
-      <button class="header-btn" @click="$emit('new-project')" title="Create New (Ctrl+N)">
-        <i-lucide-file-plus class="icon" />
-        <span>New</span>
-      </button>
-      <button class="header-btn" @click="$emit('save-project')" title="Save Project (Ctrl+S)">
-        <i-lucide-save class="icon" />
-        <span>Save</span>
-      </button>
-      <button class="header-btn" @click="handleExport" title="Export as PNG (Ctrl+E)">
-        <i-lucide-download class="icon" />
-        <span>Export</span>
-      </button>
-      <slot name="google-drive-button"></slot>
-      <slot name="google-drive-export-button"></slot>
+  <div class="header-container">
+    <div class="header">
+      <div class="left-section">
+        <button class="header-btn" @click="$emit('new-project')" title="Create New (Ctrl+N)">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <span>New</span>
+        </button>
+        <button class="header-btn" @click="$emit('save-project')" title="Save Project (Ctrl+S)">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span>Save</span>
+        </button>
+        <button class="header-btn" @click="handleExport" title="Export as PNG (Ctrl+E)">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Export</span>
+        </button>
+      </div>
+      
+      <div class="drive-section">
+        <slot name="google-drive-button"></slot>
+        <slot name="google-drive-export-button"></slot>
+      </div>
+
+      <div class="right-menu">
+        <button
+          class="header-btn undo-redo-btn"
+          @click="$emit('undo')"
+          :disabled="!canUndo"
+          title="Undo (Ctrl+Z)"
+        >
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+          <span>Undo</span>
+        </button>
+        <button
+          class="header-btn undo-redo-btn"
+          @click="$emit('redo')"
+          :disabled="!canRedo"
+          title="Redo (Ctrl+Y)"
+        >
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/></svg>
+          <span>Redo</span>
+        </button>
+        <button
+          class="header-btn undo-redo-btn reset-btn"
+          @click="$emit('reset')"
+          :disabled="!canReset"
+          title="Reset to Original"
+        >
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M21 12A9 9 0 0 0 6 5.3L3 8"/><path d="M21 22v-6h-6"/><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/></svg>
+          <span>Reset</span>
+        </button>
+      </div>
     </div>
 
     <!-- Export Dialog -->
@@ -37,43 +72,6 @@
           <button class="btn export" @click="confirmExport">Export</button>
         </div>
       </div>
-    </div>
-
-    <div class="image-dimensions" v-if="imageDimensions">
-      <span class="dimensions-label">Image Size:</span>
-      <span class="dimensions-value">{{ imageDimensions.width }} × {{ imageDimensions.height }}px</span>
-      <span class="dimensions-separator">|</span>
-      <span class="dimensions-value">{{ pixelsToMm(imageDimensions.width).toFixed(1) }} × {{ pixelsToMm(imageDimensions.height).toFixed(1) }}mm</span>
-    </div>
-
-    <div class="right-menu">
-      <button
-        class="header-btn undo-redo-btn"
-        @click="$emit('undo')"
-        :disabled="!canUndo"
-        title="Undo (Ctrl+Z)"
-      >
-        <i-lucide-undo-2 class="icon" />
-        <span>Undo</span>
-      </button>
-      <button
-        class="header-btn undo-redo-btn"
-        @click="$emit('redo')"
-        :disabled="!canRedo"
-        title="Redo (Ctrl+Y)"
-      >
-        <i-lucide-redo-2 class="icon" />
-        <span>Redo</span>
-      </button>
-      <button
-        class="header-btn undo-redo-btn"
-        @click="$emit('reset')"
-        :disabled="!canReset"
-        title="Reset to Original"
-      >
-        <i-lucide-refresh-cw class="icon" />
-        <span>Reset</span>
-      </button>
     </div>
   </div>
 </template>
@@ -106,14 +104,6 @@ export default {
     };
   },
   emits: ["new-project", "save-project", "export-project", "undo", "redo", "reset"],
-  mounted() {
-    // Add keyboard shortcuts
-    document.addEventListener('keydown', this.handleKeyboardShortcuts);
-  },
-  beforeUnmount() {
-    // Clean up event listeners
-    document.removeEventListener('keydown', this.handleKeyboardShortcuts);
-  },
   methods: {
     pixelsToMm(pixels) {
       // Approximate conversion from pixels to millimeters
@@ -162,71 +152,75 @@ export default {
         this.handleExport();
       }
     }
+  },
+  mounted() {
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', this.handleKeyboardShortcuts);
+  },
+  beforeUnmount() {
+    // Clean up event listeners
+    document.removeEventListener('keydown', this.handleKeyboardShortcuts);
   }
 };
 </script>
 
 <style scoped>
+.header-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
 .header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
+  align-items: center;
+  padding: 8px 8px; /* Reduced padding */
   background-color: #252a2e;
   border-bottom: 1px solid #3a3f45;
   height: 50px;
   width: 100%;
+  overflow: visible;
+  min-width: 1050px; /* Increased to match app container */
 }
 
-.left-menu {
+.left-section {
   display: flex;
-  gap: 8px;
+  gap: 4px; /* Reduced gap */
+  min-width: 160px;
+  flex-shrink: 1;
 }
 
-.image-dimensions {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+.drive-section {
   display: flex;
-  align-items: center;
-  padding: 5px 10px;
-  background-color: #3a3f45;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.dimensions-label {
-  color: #aaaaaa;
-  margin-right: 5px;
-}
-
-.dimensions-value {
-  color: #ffffff;
-  font-weight: bold;
-  font-family: monospace;
-}
-
-.dimensions-separator {
-  color: #aaaaaa;
-  margin: 0 8px;
+  gap: 4px; /* Reduced gap */
+  justify-content: center;
+  min-width: 280px;
+  flex-shrink: 1;
 }
 
 .right-menu {
   display: flex;
-  gap: 8px;
+  gap: 4px; /* Reduced gap */
+  padding-right: 20px;
+  width: 280px; /* Further increased width to fit all button text */
+  flex-shrink: 0;
+  justify-content: flex-end;
 }
 
 .header-btn {
   background: transparent;
   border: none;
   color: #ffffff;
-  padding: 6px 10px;
+  padding: 4px 6px;
   border-radius: 4px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px; /* Space between icon and text */
   cursor: pointer;
   transition: background-color 0.2s ease;
+  white-space: nowrap;
+  font-size: 12px; /* Smaller font */
 }
 
 .header-btn:hover {
@@ -241,18 +235,18 @@ export default {
 .header-btn .icon {
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
+  min-width: 16px;
 }
 
-.undo-redo-btn {
-  color: #ffffff;
+/* Show text in buttons by default */
+.header-btn span:not(.sr-only) {
+  display: inline; /* Show text */
 }
 
-.undo-redo-btn:disabled {
-  color: #5a5f65;
-}
-
-@media (max-width: 600px) {
-  .header-btn span {
+/* Hide text in smaller viewports */
+@media (max-width: 1150px) {
+  .header-btn span:not(.sr-only) {
     display: none;
   }
 }

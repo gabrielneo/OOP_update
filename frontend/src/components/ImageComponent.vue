@@ -18,56 +18,88 @@
 
           <!-- Movable crop box based on input dimensions -->
           <div
-            v-if="
-              activeFeature === 'crop' && cropWidthMm > 0 && cropHeightMm > 0
-            "
+            v-if="showCropper && cropWidthMm > 0 && cropHeightMm > 0"
             :key="`crop-${cropWidthMm}-${cropHeightMm}`"
             class="crop-box"
             :style="dimensionCropBoxStyle"
-            @mousedown.stop="startMoveCropBox"
-          ></div>
+            @mousedown.stop="startMoveCropBox($event)"
+          >
+            <!-- Resize handles for crop box -->
+            <div
+              class="resize-handle top-left"
+              @mousedown.stop="(event) => startCropResize('top-left', event)"
+            ></div>
+            <div
+              class="resize-handle top"
+              @mousedown.stop="(event) => startCropResize('top', event)"
+            ></div>
+            <div
+              class="resize-handle top-right"
+              @mousedown.stop="(event) => startCropResize('top-right', event)"
+            ></div>
+            <div
+              class="resize-handle right"
+              @mousedown.stop="(event) => startCropResize('right', event)"
+            ></div>
+            <div
+              class="resize-handle bottom-right"
+              @mousedown.stop="(event) => startCropResize('bottom-right', event)"
+            ></div>
+            <div
+              class="resize-handle bottom"
+              @mousedown.stop="(event) => startCropResize('bottom', event)"
+            ></div>
+            <div
+              class="resize-handle bottom-left"
+              @mousedown.stop="(event) => startCropResize('bottom-left', event)"
+            ></div>
+            <div
+              class="resize-handle left"
+              @mousedown.stop="(event) => startCropResize('left', event)"
+            ></div>
+          </div>
 
           <!-- Manual free crop box -->
           <div v-if="cropBox" class="crop-box" :style="cropBoxStyle"></div>
 
           <!-- Resize box with handles -->
           <div
-            v-if="activeFeature === 'resize' && resizeBox"
+            v-if="showResizeMask && resizeBox"
             class="resize-box"
             :style="resizeBoxStyle"
           >
-            <!-- Resize handles on corners and edges -->
+            <!-- Resize handles -->
             <div
               class="resize-handle top-left"
-              @mousedown.stop="startResize('top-left')"
+              @mousedown.stop="(event) => startResize('top-left', event)"
             ></div>
             <div
               class="resize-handle top"
-              @mousedown.stop="startResize('top')"
+              @mousedown.stop="(event) => startResize('top', event)"
             ></div>
             <div
               class="resize-handle top-right"
-              @mousedown.stop="startResize('top-right')"
+              @mousedown.stop="(event) => startResize('top-right', event)"
             ></div>
             <div
               class="resize-handle right"
-              @mousedown.stop="startResize('right')"
+              @mousedown.stop="(event) => startResize('right', event)"
             ></div>
             <div
               class="resize-handle bottom-right"
-              @mousedown.stop="startResize('bottom-right')"
+              @mousedown.stop="(event) => startResize('bottom-right', event)"
             ></div>
             <div
               class="resize-handle bottom"
-              @mousedown.stop="startResize('bottom')"
+              @mousedown.stop="(event) => startResize('bottom', event)"
             ></div>
             <div
               class="resize-handle bottom-left"
-              @mousedown.stop="startResize('bottom-left')"
+              @mousedown.stop="(event) => startResize('bottom-left', event)"
             ></div>
             <div
               class="resize-handle left"
-              @mousedown.stop="startResize('left')"
+              @mousedown.stop="(event) => startResize('left', event)"
             ></div>
           </div>
         </div>
@@ -77,6 +109,8 @@
 </template>
 
 <script>
+import { mmToPx, pxToMm, getConversionFactors } from '../utils/dpiUtils';
+
 export default {
   props: {
     image: {
@@ -90,14 +124,32 @@ export default {
     cropWidthMm: {
       type: Number,
       default: 35,
+      validator: (value) => value >= 0.1
     },
     cropHeightMm: {
       type: Number,
       default: 45,
+      validator: (value) => value >= 0.1
     },
     imageDimensions: {
       type: Object,
       default: null,
+    },
+    maintainAspectRatio: {
+      type: Boolean,
+      default: false,
+    },
+    aspectRatioValue: {
+      type: Number,
+      default: null,
+    },
+    resetCropOnApply: {
+      type: Boolean,
+      default: false,
+    },
+    hideCropOnApply: {
+      type: Boolean,
+      default: false,
     },
   },
   mounted() {
@@ -113,6 +165,11 @@ export default {
       // Add image load event to ensure resize box updates after image loads
       if (this.$refs.photoImage) {
         this.$refs.photoImage.addEventListener("load", this.handleImageLoad);
+        
+        // If image is already loaded, emit the dimensions immediately
+        if (this.$refs.photoImage.complete) {
+          this.handleImageLoad();
+        }
       }
     });
   },
@@ -136,6 +193,12 @@ export default {
         isMoving: false,
         startX: 0,
         startY: 0,
+        width: 0,  // Add width and height for resizing
+        height: 0,
+        isResizing: false,
+        resizeHandle: null,
+        resizeStartPoint: null,
+        originalBox: null,
       },
       // For resize functionality
       resizeBox: null,
@@ -147,6 +210,9 @@ export default {
       resizeEmitTimeout: null,
       // For cleanup
       faceDetectionTimeout: null,
+      showCropper: false,
+      showResizeMask: false,
+      showFaceBounds: false,
     };
   },
   computed: {
@@ -159,34 +225,62 @@ export default {
       const y = Math.min(this.cropStart.y, this.cropEnd.y);
       const width = Math.abs(this.cropEnd.x - this.cropStart.x);
       const height = Math.abs(this.cropEnd.y - this.cropStart.y);
+      
+      // Different border style when aspect ratio is maintained
+      const borderStyle = this.maintainAspectRatio ? "2px solid #007bff" : "2px dashed red";
+      const bgColor = this.maintainAspectRatio ? "rgba(0, 123, 255, 0.1)" : "rgba(255, 0, 0, 0.1)";
+      
       return {
         position: "absolute",
         left: `${x}px`,
         top: `${y}px`,
         width: `${width}px`,
         height: `${height}px`,
-        border: "2px dashed red",
-        backgroundColor: "rgba(255, 0, 0, 0.1)",
+        border: borderStyle,
+        backgroundColor: bgColor,
       };
     },
     dimensionCropBoxStyle() {
-      // Convert millimeters to pixels (approximate conversion)
-      const pxPerMm = 3.78;
-      const widthPx = Math.max(1, this.cropWidthMm) * pxPerMm;
-      const heightPx = Math.max(1, this.cropHeightMm) * pxPerMm;
+      // Use the dynamic conversion factor instead of hardcoded value
+      const { pxPerMm } = getConversionFactors();
+      
+      // Get the image element
+      const photoImage = this.$refs.photoImage;
+      if (!photoImage) return {};
+      
+      // Get the actual image dimensions on screen
+      const imgRect = photoImage.getBoundingClientRect();
+      
+      // Get the natural dimensions
+      const naturalWidth = photoImage.naturalWidth;
+      const naturalHeight = photoImage.naturalHeight;
+      
+      // Calculate scaling factor between natural and display size
+      const scaleFactorX = imgRect.width / naturalWidth;
+      const scaleFactorY = imgRect.height / naturalHeight;
+      
+      // Calculate dimensions in pixels (only if not already set by resizing)
+      if (!this.movableCropBox.width || !this.movableCropBox.height) {
+        this.movableCropBox.width = Math.max(1, this.cropWidthMm) * pxPerMm * scaleFactorX;
+        this.movableCropBox.height = Math.max(1, this.cropHeightMm) * pxPerMm * scaleFactorY;
+      }
 
       // Force a reactivity dependency on the dimensions
       this.cropWidthMm; // eslint-disable-line no-unused-expressions
       this.cropHeightMm; // eslint-disable-line no-unused-expressions
 
+      // Different border style when aspect ratio is maintained
+      const borderStyle = "2px solid #007bff";
+      const bgColor = "rgba(0, 123, 255, 0.1)";
+
       return {
         position: "absolute",
         left: `${this.movableCropBox.x}px`,
         top: `${this.movableCropBox.y}px`,
-        width: `${widthPx}px`,
-        height: `${heightPx}px`,
-        border: "2px dashed red",
-        backgroundColor: "rgba(255, 0, 0, 0.1)",
+        width: `${this.movableCropBox.width}px`,
+        height: `${this.movableCropBox.height}px`,
+        border: borderStyle,
+        backgroundColor: bgColor,
         cursor: "move",
         transition: "width 0.1s, height 0.1s",
       };
@@ -226,16 +320,87 @@ export default {
         }
       },
     },
-    activeFeature(newVal, oldVal) {
-      if (newVal === "crop") {
-        this.$nextTick(() => {
+    resetCropOnApply: {
+      handler(newVal) {
+        if (newVal && this.activeFeature === "crop") {
+          console.log("Apply clicked, resetting crop mask to center");
           this.centerCropBox();
-        });
-      } else if (newVal === "resize") {
-        this.$nextTick(() => {
-          this.initializeResizeBox();
-        });
+          
+          // Reset the prop so it can be triggered again
+          this.$nextTick(() => {
+            this.$emit('update:resetCropOnApply', false);
+          });
+        }
+      },
+      immediate: true
+    },
+    hideCropOnApply: {
+      handler(newVal) {
+        if (newVal && this.activeFeature === "crop") {
+          console.log("Apply clicked, hiding crop mask");
+          // Remove the crop mask by hiding it
+          this.hideCropMask();
+          
+          // Reset the prop so it can be triggered again
+          this.$nextTick(() => {
+            this.$emit('update:hideCropOnApply', false);
+          });
+        }
+      },
+      immediate: true
+    },
+    aspectRatioValue: {
+      handler(newVal) {
+        console.log(`aspectRatioValue changed to ${newVal}`);
+        if (newVal && this.activeFeature === "crop") {
+          this.aspectRatio = newVal;
+          
+          // If we have a crop box, adjust it to the new aspect ratio
+          if (this.cropStart && this.cropEnd && this.maintainAspectRatio) {
+            // Recalculate the crop end point to maintain the new aspect ratio
+            const width = Math.abs(this.cropEnd.x - this.cropStart.x);
+            const height = Math.abs(this.cropEnd.y - this.cropStart.y);
+            
+            // Determine which dimension to adjust
+            if (width / height > this.aspectRatio) {
+              // Adjust height
+              const adjustedHeight = width / this.aspectRatio;
+              const directionY = this.cropEnd.y > this.cropStart.y ? 1 : -1;
+              this.cropEnd.y = this.cropStart.y + (adjustedHeight * directionY);
+            } else {
+              // Adjust width
+              const adjustedWidth = height * this.aspectRatio;
+              const directionX = this.cropEnd.x > this.cropStart.x ? 1 : -1;
+              this.cropEnd.x = this.cropStart.x + (adjustedWidth * directionX);
+            }
+          }
+        }
       }
+    },
+    activeFeature: {
+      handler(newFeature) {
+        console.log("ImageComponent: Active feature changed to", newFeature);
+        this.resetFeatureStates();
+        
+        // Set up the proper feature state
+        if (newFeature === "crop") {
+          this.showCropper = true;
+          this.$nextTick(() => {
+            this.centerCropBox();
+          });
+        } else if (newFeature === "resize") {
+          // Handle resize feature separately
+          this.showResizeMask = true;
+          this.$nextTick(() => {
+            this.initializeResizeBox();
+          });
+        } else if (newFeature === "face") {
+          // No need to show any special UI for face detection initially
+        } else if (newFeature === "background-remove" || newFeature === "background-replace") {
+          // No special UI needed for background operations
+        }
+      },
+      immediate: true,
     },
     image() {
       // Reset when image changes
@@ -275,12 +440,29 @@ export default {
 
       // Get the actual image dimensions
       const imgRect = photoImage.getBoundingClientRect();
+      
+      // Get the natural dimensions
+      const naturalWidth = photoImage.naturalWidth;
+      const naturalHeight = photoImage.naturalHeight;
+      
+      // Calculate scaling factor between natural and display size
+      const scaleFactorX = imgRect.width / naturalWidth;
+      const scaleFactorY = imgRect.height / naturalHeight;
 
-      const pxPerMm = 3.78;
+      // Use the dynamic conversion factor from dpiUtils
+      const { pxPerMm } = getConversionFactors();
+      
+      // Store the aspect ratio for potential use in free cropping
+      this.aspectRatio = this.cropWidthMm / this.cropHeightMm;
 
-      // Ensure valid dimensions
-      const widthPx = Math.max(1, this.cropWidthMm) * pxPerMm;
-      const heightPx = Math.max(1, this.cropHeightMm) * pxPerMm;
+      // Calculate dimensions in pixels - applying both the mm-to-px conversion AND the image scaling
+      // Use parseFloat to handle decimal values in crop dimensions
+      const widthPx = Math.max(0.1, parseFloat(this.cropWidthMm)) * pxPerMm * scaleFactorX;
+      const heightPx = Math.max(0.1, parseFloat(this.cropHeightMm)) * pxPerMm * scaleFactorY;
+
+      // Set the dimensions in movableCropBox
+      this.movableCropBox.width = widthPx;
+      this.movableCropBox.height = heightPx;
 
       // Center the crop box within the actual image bounds
       this.movableCropBox.x = Math.max(0, (imgRect.width - widthPx) / 2);
@@ -295,7 +477,7 @@ export default {
       });
 
       console.log(
-        `Crop box centered at (${this.movableCropBox.x}, ${this.movableCropBox.y}) with dimensions: ${this.cropWidthMm}x${this.cropHeightMm}mm`
+        `Crop box centered at (${this.movableCropBox.x}, ${this.movableCropBox.y}) with dimensions: ${this.cropWidthMm}x${this.cropHeightMm}mm (${widthPx}x${heightPx}px on screen)`
       );
     },
     startMoveCropBox(event) {
@@ -316,17 +498,18 @@ export default {
       // Get the actual image bounds
       const img = this.$refs.photoImage;
       const imgRect = img.getBoundingClientRect();
-      const pxPerMm = 3.78;
-      const widthPx = Math.max(1, this.cropWidthMm) * pxPerMm;
-      const heightPx = Math.max(1, this.cropHeightMm) * pxPerMm;
 
       // Calculate new position
       let newX = event.clientX - this.movableCropBox.startX;
       let newY = event.clientY - this.movableCropBox.startY;
 
-      // Constrain within image bounds
-      newX = Math.max(0, Math.min(imgRect.width - widthPx, newX));
-      newY = Math.max(0, Math.min(imgRect.height - heightPx, newY));
+      // Constrain within image bounds - use the stored width and height
+      const width = this.movableCropBox.width;
+      const height = this.movableCropBox.height;
+      
+      // Ensure box stays within image bounds
+      newX = Math.max(0, Math.min(imgRect.width - width, newX));
+      newY = Math.max(0, Math.min(imgRect.height - height, newY));
 
       this.movableCropBox.x = newX;
       this.movableCropBox.y = newY;
@@ -363,37 +546,54 @@ export default {
       const ratioX = imgNaturalWidth / displayWidth;
       const ratioY = imgNaturalHeight / displayHeight;
 
-      // Convert mm to pixels for display
-      const pxPerMm = 3.78;
-      const displayWidthPx = Math.max(1, this.cropWidthMm) * pxPerMm;
-      const displayHeightPx = Math.max(1, this.cropHeightMm) * pxPerMm;
-
       // Calculate crop coordinates in the display
       const displayX = this.movableCropBox.x;
       const displayY = this.movableCropBox.y;
+      const displayWidthPx = this.movableCropBox.width;
+      const displayHeightPx = this.movableCropBox.height;
 
       // Convert to coordinates in the natural image
       const cropNaturalX = Math.floor(displayX * ratioX);
       const cropNaturalY = Math.floor(displayY * ratioY);
+      
+      // Convert display dimensions to natural dimensions
       const cropNaturalWidth = Math.max(1, Math.floor(displayWidthPx * ratioX));
-      const cropNaturalHeight = Math.max(
-        1,
-        Math.floor(displayHeightPx * ratioY)
-      );
+      const cropNaturalHeight = Math.max(1, Math.floor(displayHeightPx * ratioY));
 
+      // Log detailed information for debugging
       console.log(
         `Emitting crop area: x=${cropNaturalX}, y=${cropNaturalY}, width=${cropNaturalWidth}, height=${cropNaturalHeight}`
       );
       console.log(
         `Original image dimensions: ${imgNaturalWidth}x${imgNaturalHeight}, Display: ${displayWidth}x${displayHeight}`
       );
+      console.log(
+        `Display dimensions of crop: ${displayWidthPx}x${displayHeightPx} at position (${displayX},${displayY})`
+      );
+      console.log(
+        `Scale factors: ratioX=${ratioX}, ratioY=${ratioY}`
+      );
 
-      this.$emit("crop-area", {
+      // Create the crop area data with all required information
+      const cropAreaData = {
         x: cropNaturalX,
         y: cropNaturalY,
         width: cropNaturalWidth,
         height: cropNaturalHeight,
-      });
+        aspectRatio: displayWidthPx / displayHeightPx,
+        maintainAspectRatio: true,
+        // Add display dimensions for reference
+        displayX: displayX,
+        displayY: displayY, 
+        displayWidth: displayWidthPx,
+        displayHeight: displayHeightPx,
+        // Add mm dimensions
+        widthMm: this.cropWidthMm,
+        heightMm: this.cropHeightMm
+      };
+
+      // Emit the crop area data
+      this.$emit("crop-area", cropAreaData);
     },
     clearCropBox() {
       this.cropStart = null;
@@ -403,21 +603,66 @@ export default {
       event.preventDefault();
       if (this.activeFeature !== "crop") return; // Block drag if not cropping
       if (this.cropWidthMm && this.cropHeightMm) return; // Don't allow free crop if dimensions are set
-
+      
       const rect = this.$refs.imageWrapper.getBoundingClientRect();
       this.cropStart = {
         x: event.clientX - rect.left,
         y: event.clientY - rect.top,
       };
       this.isDragging = true;
+      
+      // Initialize aspect ratio for free crop
+      if (this.maintainAspectRatio) {
+        // Store the computed aspect ratio
+        this.aspectRatio = this.getCropAspectRatio();
+      }
     },
     dragging(event) {
       if (!this.isDragging) return;
       const rect = this.$refs.imageWrapper.getBoundingClientRect();
-      this.cropEnd = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      };
+      
+      // Get current position for cropping
+      const currentX = event.clientX - rect.left;
+      const currentY = event.clientY - rect.top;
+      
+      // If aspect ratio should be maintained
+      if (this.maintainAspectRatio) {
+        // Get the aspect ratio to use
+        const aspectRatio = this.getCropAspectRatio();
+        
+        // Calculate width and height based on current drag position
+        const width = Math.abs(currentX - this.cropStart.x);
+        const height = Math.abs(currentY - this.cropStart.y);
+        
+        // Determine which dimension to adjust based on the current drag
+        if (width / height > aspectRatio) {
+          // Width is proportionally larger, adjust height based on width
+          const adjustedHeight = width / aspectRatio;
+          
+          // Set the Y coordinate based on direction
+          const directionY = currentY > this.cropStart.y ? 1 : -1;
+          this.cropEnd = {
+            x: currentX,
+            y: this.cropStart.y + (adjustedHeight * directionY)
+          };
+        } else {
+          // Height is proportionally larger, adjust width based on height
+          const adjustedWidth = height * aspectRatio;
+          
+          // Set the X coordinate based on direction
+          const directionX = currentX > this.cropStart.x ? 1 : -1;
+          this.cropEnd = {
+            x: this.cropStart.x + (adjustedWidth * directionX),
+            y: currentY
+          };
+        }
+      } else {
+        // If no aspect ratio constraint, use free-form crop
+        this.cropEnd = {
+          x: currentX,
+          y: currentY,
+        };
+      }
     },
     endDrag() {
       if (!this.isDragging) return;
@@ -435,11 +680,16 @@ export default {
       const scaleX = img.naturalWidth / rect.width;
       const scaleY = img.naturalHeight / rect.height;
 
+      // Calculate the current aspect ratio
+      const currentAspectRatio = width / height;
+
       this.$emit("crop-area", {
         x: Math.floor(startX * scaleX),
         y: Math.floor(startY * scaleY),
         width: Math.floor(width * scaleX),
         height: Math.floor(height * scaleY),
+        aspectRatio: currentAspectRatio,
+        maintainAspectRatio: this.maintainAspectRatio
       });
 
       // Clear crop box after emitting
@@ -867,17 +1117,34 @@ export default {
       });
     },
     initializeResizeBox() {
-      this.resetResizeBox();
-
+      // Try to get dimensions from parent's controlPanel ref
+      let resizeWidth, resizeHeight;
+      
+      if (this.$parent && this.$parent.$refs && this.$parent.$refs.controlPanel) {
+        resizeWidth = this.$parent.$refs.controlPanel.resizeWidth;
+        resizeHeight = this.$parent.$refs.controlPanel.resizeHeight;
+        
+        if (resizeWidth && resizeHeight) {
+          console.log("Initializing resize box with control panel dimensions:", resizeWidth, "x", resizeHeight);
+          this.resetResizeBox(resizeWidth, resizeHeight);
+        } else {
+          // Default fallback behavior
+          this.resetResizeBox();
+        }
+      } else {
+        // Default fallback behavior
+        this.resetResizeBox();
+      }
+      
       // Emit initial dimensions
       this.emitResizeDimensions();
-
+ 
       // Add touch event listeners for mobile devices
       this.$nextTick(() => {
         this.addTouchEventListeners();
       });
     },
-    startResize(handle) {
+    startResize(handle, event) {
       event.preventDefault();
       event.stopPropagation();
 
@@ -1075,16 +1342,40 @@ export default {
           if (handleType) {
             e.preventDefault();
 
-            // Set resize state
-            this.isResizing = true;
-            this.resizeHandle = handleType;
+            // Determine if this is a crop resize handle (parent is crop-box) or regular resize handle
+            const parentElement = handle.parentElement;
+            const isCropHandle = parentElement && parentElement.classList.contains('crop-box');
+            
+            if (isCropHandle) {
+              // Set crop resize state
+              this.movableCropBox.isResizing = true;
+              this.movableCropBox.resizeHandle = handleType;
+              
+              const touch = e.touches[0];
+              this.movableCropBox.resizeStartPoint = {
+                x: touch.clientX,
+                y: touch.clientY,
+              };
+              
+              // Store original box state
+              this.movableCropBox.originalBox = {
+                x: this.movableCropBox.x,
+                y: this.movableCropBox.y,
+                width: this.movableCropBox.width,
+                height: this.movableCropBox.height,
+              };
+            } else {
+              // Set resize state for regular resize
+              this.isResizing = true;
+              this.resizeHandle = handleType;
 
-            const touch = e.touches[0];
-            this.resizeStartPoint = {
-              x: touch.clientX,
-              y: touch.clientY,
-            };
-            this.originalResizeBox = { ...this.resizeBox };
+              const touch = e.touches[0];
+              this.resizeStartPoint = {
+                x: touch.clientX,
+                y: touch.clientY,
+              };
+              this.originalResizeBox = { ...this.resizeBox };
+            }
           }
         });
       });
@@ -1093,57 +1384,422 @@ export default {
       document.addEventListener(
         "touchmove",
         (e) => {
-          if (!this.isResizing || !e.touches[0]) return;
+          // Handle crop box resizing
+          if (this.movableCropBox.isResizing && e.touches[0]) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            
+            // Create a synthetic event with the touch coordinates
+            const syntheticEvent = {
+              clientX: touch.clientX,
+              clientY: touch.clientY,
+            };
+            
+            // Use the crop resize logic
+            this.cropResizeMove(syntheticEvent);
+            return;
+          }
+          
+          // Handle regular resizing
+          if (this.isResizing && e.touches[0]) {
+            e.preventDefault();
+            const touch = e.touches[0];
 
-          e.preventDefault();
-          const touch = e.touches[0];
+            // Create a synthetic event with the touch coordinates
+            const syntheticEvent = {
+              clientX: touch.clientX,
+              clientY: touch.clientY,
+            };
 
-          // Create a synthetic event with the touch coordinates
-          const syntheticEvent = {
-            clientX: touch.clientX,
-            clientY: touch.clientY,
-          };
-
-          // Use the existing resize logic
-          this.resizeMove(syntheticEvent);
+            // Use the existing resize logic
+            this.resizeMove(syntheticEvent);
+          }
         },
         { passive: false }
       );
 
       // Add touchend handler
       document.addEventListener("touchend", () => {
+        // Handle crop box resizing
+        if (this.movableCropBox.isResizing) {
+          this.endCropResize();
+        }
+        
+        // Handle regular resizing
         if (this.isResizing) {
           this.endResize();
         }
       });
     },
-    // Method to reset the resize box to match the current image dimensions
-    resetResizeBox() {
+    // Method to reset the resize box to match the current image dimensions or specific dimensions
+    resetResizeBox(width, height) {
       const photoImage = this.$refs.photoImage;
       if (!photoImage) return;
 
       const imgRect = photoImage.getBoundingClientRect();
+      
+      // Get the natural aspect ratio of the image
+      const naturalRatio = photoImage.naturalWidth / photoImage.naturalHeight;
+      
+      // Check if custom dimensions were provided
+      if (width && height) {
+        // Use the provided dimensions
+        const resizeWidth = width;
+        const resizeHeight = height;
+        
+        // Calculate the aspect ratio of the desired resize dimensions
+        const resizeRatio = resizeWidth / resizeHeight;
+        
+        // Calculate the scaled size to fit in the current view
+        let newWidth, newHeight;
+        
+        if (resizeRatio > naturalRatio) {
+          // Width constrained
+          newWidth = imgRect.width;
+          newHeight = newWidth / resizeRatio;
+        } else {
+          // Height constrained
+          newHeight = imgRect.height;
+          newWidth = newHeight * resizeRatio;
+        }
+        
+        // Center the resize box
+        const x = (imgRect.width - newWidth) / 2;
+        const y = (imgRect.height - newHeight) / 2;
+        
+        this.resizeBox = {
+          x: x,
+          y: y,
+          width: newWidth,
+          height: newHeight,
+        };
+        
+        console.log("Resize box set to dimensions:", resizeWidth, "x", resizeHeight, 
+                    "scaled to view as:", newWidth, "x", newHeight);
+      } else {
+        // Default behavior - match current image dimensions
+        this.resizeBox = {
+          x: 0,
+          y: 0,
+          width: imgRect.width,
+          height: imgRect.height,
+        };
+      }
 
-      this.resizeBox = {
-        x: 0,
-        y: 0,
-        width: imgRect.width,
-        height: imgRect.height,
-      };
-
-      this.aspectRatio = imgRect.width / imgRect.height;
+      this.aspectRatio = this.resizeBox.width / this.resizeBox.height;
 
       console.log(
-        "Resize box reset to match image dimensions:",
-        this.resizeBox
+        "Resize box dimensions:",
+        this.resizeBox.width,
+        "x",
+        this.resizeBox.height
       );
     },
     // Add image load handler
     handleImageLoad() {
       console.log("Image loaded, checking if resize box needs update");
+      
+      // Get the image dimensions and emit them
+      const img = this.$refs.photoImage;
+      if (img) {
+        const dimensions = {
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        };
+        console.log("Emitting image dimensions on load:", dimensions);
+        this.$emit("resize-dimensions", dimensions);
+      }
+      
       if (this.activeFeature === "resize") {
         this.resetResizeBox();
       }
+    },
+    // Helper method to get the current crop aspect ratio
+    getCropAspectRatio() {
+      if (this.aspectRatioValue) {
+        return this.aspectRatioValue;
+      } else if (this.cropWidthMm && this.cropHeightMm) {
+        return this.cropWidthMm / this.cropHeightMm;
+      } else if (this.aspectRatio) {
+        return this.aspectRatio;
+      } else if (this.$refs.photoImage) {
+        // Use image's natural aspect ratio as default
+        const img = this.$refs.photoImage;
+        return img.naturalWidth / img.naturalHeight;
+      }
+      
+      // Default to 1:1 if no other ratio is determined
+      return 1;
+    },
+    // Public method to reset crop to center position when crop is applied
+    resetCropToCenter() {
+      if (this.activeFeature === "crop") {
+        console.log("Resetting crop mask to center position");
+        this.centerCropBox();
+        return true;
+      }
+      return false;
+    },
+    // Public method to hide crop mask when crop is applied
+    hideCropMask() {
+      if (this.activeFeature === "crop") {
+        console.log("Hiding crop mask");
+        // Emit an event to notify that crop has been completed
+        this.$emit("crop-complete");
+        // Reset state - temporarily remove crop dimensions to hide the mask
+        this.$emit("update:activeFeature", "");
+        return true;
+      }
+      return false;
+    },
+    startCropResize(handle, event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      this.movableCropBox.isResizing = true;
+      this.movableCropBox.resizeHandle = handle;
+
+      // Store original state
+      this.movableCropBox.resizeStartPoint = {
+        x: event.clientX,
+        y: event.clientY,
+      };
+      
+      // Store original box state
+      this.movableCropBox.originalBox = {
+        x: this.movableCropBox.x,
+        y: this.movableCropBox.y,
+        width: this.movableCropBox.width,
+        height: this.movableCropBox.height,
+      };
+
+      // Add event listeners to window for resize
+      window.addEventListener("mousemove", this.cropResizeMove);
+      window.addEventListener("mouseup", this.endCropResize);
+    },
+
+    cropResizeMove(event) {
+      if (!this.movableCropBox.isResizing) return;
+
+      const dx = event.clientX - this.movableCropBox.resizeStartPoint.x;
+      const dy = event.clientY - this.movableCropBox.resizeStartPoint.y;
+
+      // Get aspect ratio for crop box
+      const aspectRatio = this.getCropAspectRatio();
+      
+      // Create a new box with the updated dimensions
+      const newBox = { ...this.movableCropBox.originalBox };
+
+      // Handle resize based on which handle was grabbed
+      switch (this.movableCropBox.resizeHandle) {
+        case "right":
+          newBox.width = Math.max(20, this.movableCropBox.originalBox.width + dx);
+          // Maintain aspect ratio by adjusting height
+          newBox.height = newBox.width / aspectRatio;
+          break;
+        case "bottom":
+          newBox.height = Math.max(20, this.movableCropBox.originalBox.height + dy);
+          // Maintain aspect ratio by adjusting width
+          newBox.width = newBox.height * aspectRatio;
+          break;
+        case "left":
+          const newWidth = Math.max(20, this.movableCropBox.originalBox.width - dx);
+          newBox.width = newWidth;
+          // Maintain aspect ratio by adjusting height
+          newBox.height = newBox.width / aspectRatio;
+          newBox.x = this.movableCropBox.originalBox.x + 
+                      (this.movableCropBox.originalBox.width - newBox.width);
+          break;
+        case "top":
+          const newHeight = Math.max(20, this.movableCropBox.originalBox.height - dy);
+          newBox.height = newHeight;
+          // Maintain aspect ratio by adjusting width
+          newBox.width = newBox.height * aspectRatio;
+          newBox.y = this.movableCropBox.originalBox.y + 
+                      (this.movableCropBox.originalBox.height - newBox.height);
+          break;
+        case "bottom-right":
+          if (Math.abs(dx) > Math.abs(dy)) {
+            newBox.width = Math.max(20, this.movableCropBox.originalBox.width + dx);
+            newBox.height = newBox.width / aspectRatio;
+          } else {
+            newBox.height = Math.max(20, this.movableCropBox.originalBox.height + dy);
+            newBox.width = newBox.height * aspectRatio;
+          }
+          break;
+        case "bottom-left":
+          if (Math.abs(dx) > Math.abs(dy)) {
+            const newWidth = Math.max(20, this.movableCropBox.originalBox.width - dx);
+            newBox.width = newWidth;
+            newBox.height = newBox.width / aspectRatio;
+            newBox.x = this.movableCropBox.originalBox.x + 
+                        (this.movableCropBox.originalBox.width - newBox.width);
+          } else {
+            newBox.height = Math.max(20, this.movableCropBox.originalBox.height + dy);
+            newBox.width = newBox.height * aspectRatio;
+            newBox.x = this.movableCropBox.originalBox.x + 
+                        (this.movableCropBox.originalBox.width - newBox.width);
+          }
+          break;
+        case "top-right":
+          if (Math.abs(dx) > Math.abs(dy)) {
+            newBox.width = Math.max(20, this.movableCropBox.originalBox.width + dx);
+            newBox.height = newBox.width / aspectRatio;
+            newBox.y = this.movableCropBox.originalBox.y + 
+                        (this.movableCropBox.originalBox.height - newBox.height);
+          } else {
+            const newHeight = Math.max(20, this.movableCropBox.originalBox.height - dy);
+            newBox.height = newHeight;
+            newBox.width = newBox.height * aspectRatio;
+            newBox.y = this.movableCropBox.originalBox.y + 
+                        (this.movableCropBox.originalBox.height - newBox.height);
+          }
+          break;
+        case "top-left":
+          if (Math.abs(dx) > Math.abs(dy)) {
+            const newWidth = Math.max(20, this.movableCropBox.originalBox.width - dx);
+            newBox.width = newWidth;
+            newBox.height = newBox.width / aspectRatio;
+            newBox.x = this.movableCropBox.originalBox.x + 
+                        (this.movableCropBox.originalBox.width - newBox.width);
+            newBox.y = this.movableCropBox.originalBox.y + 
+                        (this.movableCropBox.originalBox.height - newBox.height);
+          } else {
+            const newHeight = Math.max(20, this.movableCropBox.originalBox.height - dy);
+            newBox.height = newHeight;
+            newBox.width = newBox.height * aspectRatio;
+            newBox.x = this.movableCropBox.originalBox.x + 
+                        (this.movableCropBox.originalBox.width - newBox.width);
+            newBox.y = this.movableCropBox.originalBox.y + 
+                        (this.movableCropBox.originalBox.height - newBox.height);
+          }
+          break;
+      }
+
+      // Constrain within image bounds
+      const photoImage = this.$refs.photoImage;
+      if (photoImage) {
+        const imgRect = photoImage.getBoundingClientRect();
+        
+        // Make sure the box doesn't go outside the image
+        if (newBox.x < 0) {
+          newBox.x = 0;
+        }
+        if (newBox.y < 0) {
+          newBox.y = 0;
+        }
+        if (newBox.x + newBox.width > imgRect.width) {
+          newBox.width = imgRect.width - newBox.x;
+          newBox.height = newBox.width / aspectRatio;
+        }
+        if (newBox.y + newBox.height > imgRect.height) {
+          newBox.height = imgRect.height - newBox.y;
+          newBox.width = newBox.height * aspectRatio;
+        }
+      }
+
+      // Update movable crop box
+      this.movableCropBox.x = newBox.x;
+      this.movableCropBox.y = newBox.y;
+      this.movableCropBox.width = newBox.width;
+      this.movableCropBox.height = newBox.height;
+      
+      // Calculate and update crop dimensions in mm
+      this.updateCropDimensionsFromBox();
+
+      // Emit current dimensions during resize
+      this.$nextTick(() => {
+        this.emitCropAreaFromDimensions();
+      });
+    },
+
+    endCropResize() {
+      if (!this.movableCropBox.isResizing) return;
+
+      this.movableCropBox.isResizing = false;
+      this.movableCropBox.resizeHandle = null;
+
+      // Remove event listeners
+      window.removeEventListener("mousemove", this.cropResizeMove);
+      window.removeEventListener("mouseup", this.endCropResize);
+
+      // Update crop dimensions in mm
+      this.updateCropDimensionsFromBox();
+
+      // Final emit of crop dimensions
+      this.emitCropAreaFromDimensions();
+    },
+    
+    // Helper method to update the crop dimensions in mm based on the current box size
+    updateCropDimensionsFromBox() {
+      const photoImage = this.$refs.photoImage;
+      if (!photoImage) return;
+      
+      // Get image dimensions
+      const naturalWidth = photoImage.naturalWidth;
+      const naturalHeight = photoImage.naturalHeight;
+      const displayWidth = photoImage.clientWidth;
+      const displayHeight = photoImage.clientHeight;
+      
+      // Calculate scaling factors
+      const scaleFactorX = displayWidth / naturalWidth;
+      const scaleFactorY = displayHeight / naturalHeight;
+      
+      // Use the conversion factors
+      const { pxPerMm } = getConversionFactors();
+      
+      // Calculate dimensions in mm
+      const widthMm = this.movableCropBox.width / (pxPerMm * scaleFactorX);
+      const heightMm = this.movableCropBox.height / (pxPerMm * scaleFactorY);
+      
+      console.log('Updating crop dimensions from box:', {
+        width: this.movableCropBox.width,
+        height: this.movableCropBox.height,
+        widthMm,
+        heightMm
+      });
+      
+      // Store dimensions but don't trigger centerCropBox
+      // Use Vue.set to ensure reactivity
+      this.$set(this, 'cropWidthMm', widthMm);
+      this.$set(this, 'cropHeightMm', heightMm);
+    },
+    resetFeatureStates() {
+      // Reset all feature-specific states
+      this.showCropper = false;
+      this.showResizeMask = false;
+      this.showFaceBounds = false;
+    },
+    initializeResizeMask() {
+      // Set up initial resize box to match the image size
+      if (this.$refs.photoImage && this.$refs.photoImage.naturalWidth) {
+        const imageWrapper = this.$refs.imageWrapper;
+        const image = this.$refs.photoImage;
+        
+        this.resizeBox = {
+          x: 0,
+          y: 0,
+          width: image.offsetWidth,
+          height: image.offsetHeight,
+          isResizing: false,
+          resizeHandle: null,
+          startX: 0,
+          startY: 0,
+          startWidth: 0,
+          startHeight: 0,
+        };
+        
+        // Emit initial dimensions
+        this.$emit("resize-dimensions", {
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+        });
+      }
+    },
+    
+    resetResizeMask() {
+      // Reset the resize box to the original image dimensions
+      this.initializeResizeMask();
     },
   },
   beforeDestroy() {
@@ -1163,6 +1819,8 @@ export default {
     window.removeEventListener("mouseup", this.endResize);
     window.removeEventListener("mousemove", this.moveCropBox);
     window.removeEventListener("mouseup", this.endMoveCropBox);
+    window.removeEventListener("mousemove", this.cropResizeMove);
+    window.removeEventListener("mouseup", this.endCropResize);
 
     // Remove touch event listeners
     document.removeEventListener("touchmove", this.resizeMove);
@@ -1176,6 +1834,8 @@ export default {
     // Clear any resize state
     this.isResizing = false;
     this.resizeHandle = null;
+    this.movableCropBox.isResizing = false;
+    this.movableCropBox.resizeHandle = null;
   },
 };
 </script>

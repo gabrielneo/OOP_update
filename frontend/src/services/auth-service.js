@@ -88,6 +88,51 @@ export default {
       };
     }
   },
+  
+  /**
+   * Force a completely new login by clearing all existing credentials
+   * and starting a fresh Google account selection flow
+   * @returns {Promise<Object>} Login result
+   */
+  async forceNewLogin() {
+    try {
+      console.log('Forcing new login by wiping all credentials...');
+      // First, clear all existing credentials
+      const response = await fetch(`/api/auth/force-new-login`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Force new login failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.url) {
+        throw new Error('Invalid authorization URL response from force-new-login');
+      }
+      
+      console.log('Force new login succeeded, redirecting to Google auth URL');
+      // Store the current URL to redirect back to after auth
+      localStorage.setItem('auth_redirect', window.location.href);
+      localStorage.setItem('force_new_login', 'true');
+      
+      // Redirect to the Google authorization URL with force approval
+      window.location.href = data.url;
+      return data;
+    } catch (error) {
+      console.error('Error forcing new login:', error);
+      return {
+        success: false,
+        message: `Error: ${error.message}`
+      };
+    }
+  },
 
   /**
    * Handle OAuth redirect if there are error parameters
@@ -97,6 +142,13 @@ export default {
     const urlParams = new URLSearchParams(window.location.search);
     const error = urlParams.get('error');
     const message = urlParams.get('message');
+    const success = urlParams.get('success');
+    
+    // Remove the force_new_login flag if it exists
+    if (localStorage.getItem('force_new_login')) {
+      console.log('Force new login completed');
+      localStorage.removeItem('force_new_login');
+    }
     
     if (error) {
       console.error('Auth error:', error, message);
@@ -106,6 +158,23 @@ export default {
         error,
         message: message || 'Authentication failed'
       };
+    }
+    
+    if (success === 'true') {
+      console.log('Authentication successful');
+      // Clear the URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Redirect to the stored redirect URL if available
+      const redirectUrl = localStorage.getItem('auth_redirect');
+      if (redirectUrl) {
+        localStorage.removeItem('auth_redirect');
+        if (redirectUrl !== window.location.href) {
+          window.location.href = redirectUrl;
+        }
+      }
+      
+      return { success: true };
     }
     
     return null;

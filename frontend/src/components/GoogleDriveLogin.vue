@@ -12,6 +12,17 @@
       />
       <span>{{ buttonText }}</span>
     </button>
+    
+    <button 
+      v-if="showForceLoginButton"
+      @click="forceNewGoogleLogin" 
+      class="force-login-button"
+      :disabled="isLoading"
+    >
+      <span>Force New Login</span>
+      <small>Use different Google account</small>
+    </button>
+    
     <div v-if="error" class="error-message">
       {{ error }}
     </div>
@@ -27,7 +38,9 @@ export default {
     return {
       isLoading: false,
       error: null,
-      buttonText: "Login with Google Drive"
+      buttonText: "Login with Google Drive",
+      isLoggedIn: false,
+      showForceLoginButton: false
     };
   },
   mounted() {
@@ -41,11 +54,19 @@ export default {
       this.error = message || "Authentication failed";
     } else if (success) {
       this.buttonText = "Connected to Google Drive";
+      this.isLoggedIn = true;
+      this.showForceLoginButton = true;
       this.$emit('login-success');
     }
     
     // Check if already logged in
     this.checkLoginStatus();
+    
+    // Check if this was a forced login attempt
+    if (localStorage.getItem('force_login_attempt')) {
+      localStorage.removeItem('force_login_attempt');
+      console.log('Completed forced login attempt');
+    }
   },
   methods: {
     async checkLoginStatus() {
@@ -53,6 +74,8 @@ export default {
         const status = await googleApiService.checkLoginStatus();
         if (status.isLoggedIn) {
           this.buttonText = "Connected to Google Drive";
+          this.isLoggedIn = true;
+          this.showForceLoginButton = true;
         }
       } catch (error) {
         console.error("Failed to check login status:", error);
@@ -94,6 +117,33 @@ export default {
         this.buttonText = "Login with Google Drive";
         this.isLoading = false;
       }
+    },
+    
+    async forceNewGoogleLogin() {
+      this.isLoading = true;
+      this.error = null;
+      this.buttonText = "Preparing fresh login...";
+
+      try {
+        // First check if our backend is available
+        const isBackendAvailable = await this.checkBackendAvailability();
+
+        if (!isBackendAvailable) {
+          throw new Error(
+            "Backend server is not available. Please make sure the server is running."
+          );
+        }
+
+        // Use the force-new-login method that completely wipes credentials
+        await googleApiService.forceNewLogin();
+        // Note: The page will redirect, so no further code will execute here
+        
+      } catch (error) {
+        console.error("Error during forced new Google login:", error);
+        this.error = error.message || "Failed to initiate new login";
+        this.buttonText = this.isLoggedIn ? "Connected to Google Drive" : "Login with Google Drive";
+        this.isLoading = false;
+      }
     }
   }
 };
@@ -127,6 +177,35 @@ export default {
 }
 
 .google-drive-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.force-login-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.force-login-button small {
+  font-size: 11px;
+  color: #666;
+  margin-top: 3px;
+}
+
+.force-login-button:hover {
+  background-color: #e8e8e8;
+}
+
+.force-login-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

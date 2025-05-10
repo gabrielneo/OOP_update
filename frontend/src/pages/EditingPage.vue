@@ -33,32 +33,44 @@
       </template>
     </Header>
 
+    <!-- Feature Panel Component -->
+    <FeaturePanel
+      :activeFeature="activeFeature"
+      @feature-selected="setActiveFeature"
+    />
+
     <div class="main-container">
-      <!-- Feature Panel Component -->
-      <FeaturePanel
-        :activeFeature="activeFeature"
-        @feature-selected="setActiveFeature"
-      />
+      <!-- Non-blocking message when no image is uploaded -->
+      <div v-if="!currentPhoto" class="no-image-message-container">
+        <div class="no-image-message">Upload your image to start first!</div>
+      </div>
 
       <!-- Image Component -->
       <ImageComponent
+        v-if="currentPhoto"
         ref="imageComponent"
-        :image="currentPhoto || '/assets/zhiyuan.jpg'"
+        :image="currentPhoto"
         :activeFeature="activeFeature"
         :cropWidthMm="cropWidth"
         :cropHeightMm="cropHeight"
         :imageDimensions="imageDimensions"
+        :maintain-aspect-ratio="true"
+        v-model:hide-crop-on-apply="hideCropOnApply"
         @crop-area="cropArea = $event"
+        @crop-complete="handleCropComplete"
         @resize-dimensions="handleResizeDimensions"
       />
+      <div v-else class="empty-canvas"></div>
 
       <!-- Control Panel Component (only shown when a feature is selected) -->
       <ControlPanel
         v-if="activeFeature"
+        ref="controlPanel"
         :feature="activeFeature"
         :cropWidth="cropWidth"
         :cropHeight="cropHeight"
         :imageDimensions="imageDimensions"
+        :image="currentPhoto"
         @update:cropWidth="cropWidth = $event"
         @update:cropHeight="cropHeight = $event"
         @apply-changes="applyChanges"
@@ -66,14 +78,23 @@
         @faceDetectionChange="handleFaceDetectionChange"
         @upload-background-image="handleBackgroundImageUpload"
         @enhancement-preview="handleEnhancementPreview"
+        @reset-resize-mask="resetResizeMask"
+        @request-image-for-compliance="provideImageForCompliance"
         @close="closeControlPanel"
       />
     </div>
+    
+    <!-- Dimensions Bar - Now at the bottom of the page -->
+    <DimensionsBar
+      :imageDimensions="imageDimensions"
+      class="dimensions-bottom"
+    />
   </div>
 </template>
 
 <script>
 import Header from "../components/Header.vue";
+import DimensionsBar from "../components/DimensionsBar.vue";
 import FeaturePanel from "../components/FeaturePanel.vue";
 import ImageComponent from "../components/ImageComponent.vue";
 import ControlPanel from "../components/ControlPanel.vue";
@@ -83,6 +104,7 @@ import GoogleDriveExportButton from "../components/GoogleDriveExportButton.vue";
 export default {
   components: {
     Header,
+    DimensionsBar,
     FeaturePanel,
     ImageComponent,
     ControlPanel,
@@ -107,6 +129,7 @@ export default {
       // For enhancement preview throttling
       previewThrottleTimeout: null,
       isPreviewLoading: false,
+      hideCropOnApply: false,
     };
   },
   watch: {
@@ -116,6 +139,12 @@ export default {
         console.log("Feature changed to crop: Setting default crop dimensions");
         // Force updating the crop dimensions when changing to crop feature
         this.updateCropDimensions(35, 45);
+      }
+      
+      if (newVal === "resize") {
+        console.log("Feature changed to resize: Initializing resize interface");
+        // No special initialization needed beyond fetching dimensions
+        this.fetchImageDimensions();
       }
     },
     // Log crop dimensions changes for debugging
@@ -130,6 +159,34 @@ export default {
     setActiveFeature(feature) {
       this.activeFeature = feature;
       console.log(`Active feature set to: ${feature}`);
+      
+      // Always fetch image dimensions when any feature is selected
+      if (this.currentPhoto) {
+        this.fetchImageDimensions();
+      }
+      
+      // Special handling for crop feature
+      if (feature === "crop") {
+        console.log("Feature changed to crop: Setting default crop dimensions");
+        this.updateCropDimensions(35, 45);
+      }
+      
+      // Special handling for resize feature
+      if (feature === "resize") {
+        console.log("Feature changed to resize: Fetching current dimensions");
+        this.fetchImageDimensions();
+      }
+      
+      // Automatically start compliance check when compliance-check feature is selected
+      if (feature === "compliance-check") {
+        console.log("Feature changed to compliance-check: Starting automatic compliance check");
+        // Wait for the component to be created before calling its method
+        this.$nextTick(() => {
+          if (this.$refs.controlPanel) {
+            this.$refs.controlPanel.checkCompliance();
+          }
+        });
+      }
     },
     closeControlPanel() {
       this.activeFeature = null;
@@ -251,19 +308,49 @@ export default {
           // Only update if dimensions are valid
           if (dimensions && dimensions.width > 0 && dimensions.height > 0) {
             this.imageDimensions = dimensions;
-            console.log("Image dimensions updated:", dimensions);
+            console.log("Image dimensions updated from server:", dimensions);
           } else {
             console.error("Invalid dimensions received:", dimensions);
+            this.getImageDimensionsFromDOM();
           }
         } else {
           console.error(
             "Failed to fetch image dimensions:",
             await response.text()
           );
+          this.getImageDimensionsFromDOM();
         }
       } catch (error) {
         console.error("Error fetching image dimensions:", error);
+        this.getImageDimensionsFromDOM();
       }
+    },
+    
+    // Get dimensions directly from the image element as a fallback
+    getImageDimensionsFromDOM() {
+      console.log("Getting image dimensions from DOM");
+      this.$nextTick(() => {
+        const imageComponent = this.$refs.imageComponent;
+        if (imageComponent && imageComponent.$refs.photoImage) {
+          const img = imageComponent.$refs.photoImage;
+          if (img.complete) {
+            this.imageDimensions = {
+              width: img.naturalWidth,
+              height: img.naturalHeight
+            };
+            console.log("Image dimensions from DOM:", this.imageDimensions);
+          } else {
+            // If image isn't loaded yet, wait for it
+            img.onload = () => {
+              this.imageDimensions = {
+                width: img.naturalWidth,
+                height: img.naturalHeight
+              };
+              console.log("Image dimensions from DOM onload:", this.imageDimensions);
+            };
+          }
+        }
+      });
     },
 
     async uploadNewImage(event) {
@@ -304,8 +391,9 @@ export default {
     // Handle explicit dimension updates
     handleApplyDimensions({ width, height }) {
       console.log(`Explicitly applying dimensions: ${width}x${height}`);
-      this.cropWidth = width;
-      this.cropHeight = height;
+      // Ensure values are parsed as floats to handle decimal places
+      this.cropWidth = parseFloat(width);
+      this.cropHeight = parseFloat(height);
 
       // Force the ImageComponent to update its crop box
       if (this.$refs.imageComponent) {
@@ -313,11 +401,11 @@ export default {
       }
     },
 
-    // Handle resize dimensions from dragging resize handles
+    // Handle resize dimensions from dragging resize handles or when the image loads
     handleResizeDimensions(dimensions) {
-      console.log("Received resize dimensions:", dimensions);
+      console.log("Received image dimensions:", dimensions);
 
-      // Only update the displayed dimensions in the control panel
+      // Always update the displayed dimensions in the header
       if (this.imageDimensions) {
         this.imageDimensions.width = dimensions.width;
         this.imageDimensions.height = dimensions.height;
@@ -329,6 +417,12 @@ export default {
       }
 
       // Don't apply resize automatically - wait for user to click Apply button
+    },
+
+    // Add a handler for crop completion
+    handleCropComplete() {
+      console.log('Crop operation completed and mask hidden');
+      // Can add additional logic here if needed
     },
 
     // Update the applyChanges method to handle resize
@@ -347,9 +441,9 @@ export default {
           const scaleX = imgEl.naturalWidth / rect.width;
           const scaleY = imgEl.naturalHeight / rect.height;
 
-          // Ensure valid dimensions
-          const cropWidth = Math.max(1, this.cropWidth);
-          const cropHeight = Math.max(1, this.cropHeight);
+          // Ensure valid dimensions and handle decimal places
+          const cropWidth = Math.max(0.1, parseFloat(this.cropWidth));
+          const cropHeight = Math.max(0.1, parseFloat(this.cropHeight));
 
           const cropPxWidth = (cropWidth / 35) * 140;
           const cropPxHeight = (cropHeight / 45) * 180;
@@ -396,9 +490,12 @@ export default {
 
             // Clear crop related state
             this.cropArea = null;
-            if (this.$refs.imageComponent) {
-              this.$refs.imageComponent.clearCropBox();
-            }
+            
+            // Hide the crop mask and control panel by setting activeFeature to null
+            this.activeFeature = null;
+            
+            // Show success notification
+            this.showNotification("Image cropped successfully!", "success");
           } else {
             console.error("Failed to crop image:", await cropResponse.text());
           }
@@ -434,6 +531,62 @@ export default {
           }
         } catch (error) {
           console.error("Error resizing image:", error);
+        }
+      } else if (changes.type === "clothes") {
+        try {
+          // Create loading indicator
+          const loadingIndicator = document.createElement("div");
+          loadingIndicator.textContent = "Applying clothing replacement...";
+          loadingIndicator.style.position = "fixed";
+          loadingIndicator.style.top = "50%";
+          loadingIndicator.style.left = "50%";
+          loadingIndicator.style.transform = "translate(-50%, -50%)";
+          loadingIndicator.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+          loadingIndicator.style.color = "white";
+          loadingIndicator.style.padding = "15px 30px";
+          loadingIndicator.style.borderRadius = "8px";
+          loadingIndicator.style.zIndex = "9999";
+
+          // Add the loading indicator
+          document.body.appendChild(loadingIndicator);
+
+          const response = await fetch(
+            "http://localhost:8080/api/clothes-replace",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "clothes",
+                clothingType: changes.clothingType || "formal"
+              }),
+            }
+          );
+
+          // Remove loading indicator
+          if (document.body.contains(loadingIndicator)) {
+            document.body.removeChild(loadingIndicator);
+          }
+
+          if (response.ok) {
+            // Update the image and all related state
+            await this.updateImageAfterEdit();
+            
+            // Show success notification
+            this.showNotification(
+              "Clothing replacement applied successfully!",
+              "success"
+            );
+          } else {
+            const errorText = await response.text();
+            console.error("Failed to replace clothing:", errorText);
+            this.showNotification(
+              "Failed to replace clothing: " + errorText,
+              "error"
+            );
+          }
+        } catch (error) {
+          console.error("Error replacing clothing:", error);
+          this.showNotification("Error: " + error.message, "error");
         }
       } else if (changes.type === "background-remove") {
         try {
@@ -627,9 +780,14 @@ export default {
         if (response.ok) {
           await this.updateImageAfterEdit();
           console.log("Existing image loaded on component mount");
+        } else {
+          // Even if we don't have an image yet, try to get dimensions
+          await this.fetchImageDimensions();
         }
       } catch (error) {
         console.log("No existing image found or error fetching image:", error);
+        // Still try to fetch dimensions
+        await this.fetchImageDimensions();
       }
     },
 
@@ -1011,21 +1169,6 @@ export default {
       }
     },
     
-    // Method to fetch image dimensions from the server
-    async fetchImageDimensions() {
-      try {
-        const response = await fetch("http://localhost:8080/api/image/dimensions");
-        if (response.ok) {
-          const dimensions = await response.json();
-          this.imageWidth = dimensions.width;
-          this.imageHeight = dimensions.height;
-          console.log("Image dimensions fetched:", dimensions);
-        }
-      } catch (error) {
-        console.error("Error fetching image dimensions:", error);
-      }
-    },
-    
     // Method to update image dimensions from the current photo element
     updateImageDimensions() {
       this.$nextTick(() => {
@@ -1053,26 +1196,55 @@ export default {
       console.log("Authentication required for Google Drive");
       this.showNotification("Please log in to Google Drive first by using the 'Import from Google Drive' button", "warning");
     },
+
+    provideImageForCompliance() {
+      console.log("Image requested for compliance check");
+      if (this.currentPhoto) {
+        // Pass the current image to the control panel component
+        const controlPanel = this.$refs.controlPanel;
+        if (controlPanel) {
+          console.log("Setting image for compliance check");
+          controlPanel.image = this.currentPhoto;
+          // Immediately trigger compliance check again after setting the image
+          setTimeout(() => controlPanel.checkCompliance(), 100);
+        }
+      } else {
+        console.error("No image available for compliance check");
+      }
+    },
+
+    checkImageCompliance() {
+      // This function is now a no-op since the compliance button was removed
+      console.log("Compliance check button was removed, this function is no longer used");
+      return;
+    },
+
+    resetResizeMask() {
+      if (this.$refs.imageComponent) {
+        this.$refs.imageComponent.resetResizeBox();
+      }
+    },
   },
   mounted() {
     // Check if an image is already available and fetch its dimensions
     this.checkForExistingImage();
+    
+    // Ensure we have image dimensions for display in header, even if using default image
+    if (!this.imageDimensions) {
+      this.fetchImageDimensions();
+    }
   },
 };
 </script>
 
 <style scoped>
 .editing-page {
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100%;
   background-color: #1e2124;
-  color: #ffffff;
-  font-family: "Inter", sans-serif;
   overflow: hidden;
-  margin: 0;
-  padding: 0;
+  min-width: 1050px; /* Increased from 960px to match app container */
 }
 
 .main-container {
@@ -1081,6 +1253,12 @@ export default {
   overflow: hidden;
   margin-top: 0;
   padding-top: 0;
+  min-width: 1050px; /* Increased from 960px to match app container */
+}
+
+.dimensions-bottom {
+  margin-top: auto;
+  padding-bottom: 10px; /* Add padding to the bottom */
 }
 
 .header-google-drive-btn {
@@ -1109,5 +1287,33 @@ export default {
 .header-google-drive-btn :deep(.drive-button:disabled) {
   color: #5a5f65;
   cursor: not-allowed;
+}
+
+/* Updated styles for non-blocking message */
+.no-image-message-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  pointer-events: none; /* Allow interaction with elements below */
+}
+
+.no-image-message {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 15px 25px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.empty-canvas {
+  flex: 1;
+  background-color: #2d3035;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 </style>

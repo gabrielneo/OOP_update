@@ -10,6 +10,11 @@ import BatchEditingPage from './pages/BatchEditingPage.vue';
 const routes = [
   {
     path: '/',
+    name: 'EditingPage',
+    component: EditingPage
+  },
+  {
+    path: '/home',
     name: 'Home',
     component: HomePage
   },
@@ -20,7 +25,7 @@ const routes = [
   },
   {
     path: '/edit/:fileId?',
-    name: 'EditingPage',
+    name: 'EditingPageWithParam',
     component: EditingPage,
     props: true
   },

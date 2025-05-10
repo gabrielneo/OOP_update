@@ -66,7 +66,7 @@ public class AuthCallbackController {
             logger.info("Drive service refreshed: {}", refreshed);
 
             // Redirect to the editing page or frontend
-            return new RedirectView("http://localhost:5173/editingPage");
+            return new RedirectView("http://localhost:5173/");
         } catch (Exception e) {
             logger.error("Error processing callback", e);
             // Redirect to an error page

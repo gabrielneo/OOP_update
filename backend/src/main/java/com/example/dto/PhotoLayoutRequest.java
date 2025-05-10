@@ -6,8 +6,11 @@ public class PhotoLayoutRequest {
     private int cols;
     private int originalWidth;
     private int originalHeight;
-    private int finalWidth;
-    private int finalHeight;
+    private double finalWidth;
+    private double finalHeight;
+    private boolean useOriginalImage;
+    private boolean isFirstLayout;
+    private int layoutCount;
 
     public int getBorderSize() {
         return borderSize;
@@ -49,19 +52,35 @@ public class PhotoLayoutRequest {
         this.originalHeight = originalHeight;
     }
 
-    public int getFinalWidth() {
+    public double getFinalWidth() {
         return finalWidth;
     }
 
-    public void setFinalWidth(int finalWidth) {
+    public void setFinalWidth(double finalWidth) {
         this.finalWidth = finalWidth;
     }
 
-    public int getFinalHeight() {
+    public double getFinalHeight() {
         return finalHeight;
     }
 
-    public void setFinalHeight(int finalHeight) {
+    public void setFinalHeight(double finalHeight) {
         this.finalHeight = finalHeight;
     }
-} 
+
+    public boolean isFirstLayout() {
+        return isFirstLayout;
+    }
+
+    public void setFirstLayout(boolean firstLayout) {
+        isFirstLayout = firstLayout;
+    }
+
+    public int getLayoutCount() {
+        return layoutCount;
+    }
+
+    public void setLayoutCount(int layoutCount) {
+        this.layoutCount = layoutCount;
+    }
+}

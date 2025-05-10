@@ -30,7 +30,7 @@ public class WebConfig {
     @Value("${oauth.redirect.base-url:http://localhost:5173/editingPage}")
     private String redirectUrl;
 
-    @Value("${oauth.allowed-origins:http://localhost:5173}")
+    @Value("${oauth.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000}")
     private String allowedOrigin;
 
     /**
@@ -41,20 +41,22 @@ public class WebConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                logger.info("Configuring CORS with frontend URL: {}", allowedOrigin);
+                String[] origins = allowedOrigin.split(",");
+                logger.info("Configuring CORS with frontend URLs: {}", allowedOrigin);
                 logger.info("Configuring redirect URL: {}", redirectUrl);
 
-                // Configure CORS for API endpoints
+                // Configure CORS for API endpoints with all possible origins
                 registry.addMapping("/api/**")
-                        .allowedOrigins(allowedOrigin)
+                        .allowedOrigins(origins)
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
+                        .exposedHeaders("Content-Disposition")
                         .allowCredentials(true)
                         .maxAge(3600);
 
                 // Configure CORS for auth endpoints
                 registry.addMapping("/auth/**")
-                        .allowedOrigins(allowedOrigin)
+                        .allowedOrigins(origins)
                         .allowedMethods("GET", "POST", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true)
@@ -62,7 +64,7 @@ public class WebConfig {
 
                 // Configure CORS for OAuth endpoints
                 registry.addMapping("/oauth2/**")
-                        .allowedOrigins(allowedOrigin)
+                        .allowedOrigins(origins)
                         .allowedMethods("GET", "POST", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true)

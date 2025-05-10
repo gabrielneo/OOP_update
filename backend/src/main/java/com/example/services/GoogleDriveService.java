@@ -53,13 +53,13 @@ public class GoogleDriveService {
     @Value("${google.drive.application.name}")
     private String APPLICATION_NAME;
 
-    private final GoogleDriveConfig driveConfig;
+    private GoogleDriveConfig driveConfig;
     private Drive driveService;
 
     @Autowired
-    public GoogleDriveService(GoogleDriveConfig driveConfig, Drive driveService) {
+    public GoogleDriveService(GoogleDriveConfig driveConfig) {
         this.driveConfig = driveConfig;
-        this.driveService = driveService;
+        // this.driveService = driveService;
         logger.info("GoogleDriveService initialized with Drive service");
     }
 
@@ -92,6 +92,25 @@ public class GoogleDriveService {
         }
     }
 
+    // Why this helps: ensures that the Drive service is lazy-loaded only when
+    // needed, and ensures it was properly initialized (not null).
+    private Drive getDriveService() {
+        if (this.driveService == null) {
+            logger.info("Drive service not initialized - calling refreshDriveService()");
+            try {
+                boolean refreshed = refreshDriveService();
+                if (!refreshed) {
+                    throw new IllegalStateException(
+                            "Drive service could not be initialized due to missing credentials.");
+                }
+            } catch (Exception e) {
+                logger.error("Error initializing Drive service", e);
+                throw new RuntimeException("Failed to initialize Drive service", e);
+            }
+        }
+        return this.driveService;
+    }
+
     /**
      * Lists files and folders in Google Drive.
      * 
@@ -102,11 +121,11 @@ public class GoogleDriveService {
      */
     public FileList listFiles(String folderId) throws IOException {
         // Try to refresh the drive service if needed
-        try {
-            refreshDriveService();
-        } catch (Exception e) {
-            logger.warn("Error refreshing Drive service before listing files", e);
-        }
+        // try {
+        //     refreshDriveService();
+        // } catch (Exception e) {
+        //     logger.warn("Error refreshing Drive service before listing files", e);
+        // }
 
         logger.info("Listing files from Google Drive with folderId: {}", folderId);
 
@@ -123,7 +142,7 @@ public class GoogleDriveService {
 
         // Get files from Google Drive
         try {
-            FileList result = driveService.files().list()
+            FileList result = getDriveService().files().list()
                     .setQ(queryBuilder.toString())
                     .setPageSize(100)
                     .setFields("files(id, name, mimeType, thumbnailLink, webViewLink, parents)")
@@ -178,7 +197,7 @@ public class GoogleDriveService {
         AbstractInputStreamContent fileContent = new InputStreamContent(mimeType, inputStream);
 
         // Upload file to Google Drive
-        File uploadedFile = driveService.files().create(fileMetadata, fileContent)
+        File uploadedFile = getDriveService().files().create(fileMetadata, fileContent)
                 .setFields("id, name, mimeType, modifiedTime, webViewLink, size")
                 .execute();
 
@@ -216,7 +235,7 @@ public class GoogleDriveService {
         FileContent fileContent = new FileContent(mimeType, localFile);
 
         // Upload file to Google Drive
-        File uploadedFile = driveService.files().create(fileMetadata, fileContent)
+        File uploadedFile = getDriveService().files().create(fileMetadata, fileContent)
                 .setFields("id, name, mimeType, modifiedTime, webViewLink, size")
                 .execute();
 
@@ -246,7 +265,7 @@ public class GoogleDriveService {
                     fileId, newContent.length, mimeType);
 
             // Get existing file metadata
-            File file = driveService.files().get(fileId).execute();
+            File file = getDriveService().files().get(fileId).execute();
             logger.info("Retrieved file metadata for {}: name={}, mimeType={}",
                     fileId, file.getName(), file.getMimeType());
 
@@ -268,7 +287,7 @@ public class GoogleDriveService {
 
             // Update file on Google Drive
             logger.info("Sending update request to Google Drive API");
-            File updatedFile = driveService.files().update(fileId, file, fileContent)
+            File updatedFile = getDriveService().files().update(fileId, file, fileContent)
                     .setFields("id, name, mimeType, modifiedTime, webViewLink, size")
                     .execute();
 
@@ -308,7 +327,7 @@ public class GoogleDriveService {
         }
 
         // Create folder in Google Drive
-        File folder = driveService.files().create(folderMetadata)
+        File folder = getDriveService().files().create(folderMetadata)
                 .setFields("id, name, mimeType, modifiedTime, webViewLink")
                 .execute();
 
@@ -332,7 +351,7 @@ public class GoogleDriveService {
      */
     public Map<String, Object> getFileContent(String fileId) throws IOException {
         // Get file metadata
-        File file = driveService.files().get(fileId)
+        File file = getDriveService().files().get(fileId)
                 .setFields("id, name, mimeType, modifiedTime, webViewLink, size")
                 .execute();
 
@@ -371,11 +390,11 @@ public class GoogleDriveService {
             result.put("mimeType", exportMimeType);
 
             // Export the file
-            driveService.files().export(fileId, exportMimeType)
+            getDriveService().files().export(fileId, exportMimeType)
                     .executeMediaAndDownloadTo(outputStream);
         } else {
             // Download regular file content
-            driveService.files().get(fileId)
+            getDriveService().files().get(fileId)
                     .executeMediaAndDownloadTo(outputStream);
         }
 
@@ -442,7 +461,7 @@ public class GoogleDriveService {
                     fileId, newContent.length, mimeType);
 
             // Get existing file metadata
-            File originalFile = driveService.files().get(fileId)
+            File originalFile = getDriveService().files().get(fileId)
                     .setFields("name,parents")
                     .execute();
 
@@ -488,7 +507,7 @@ public class GoogleDriveService {
     public byte[] downloadFile(String fileId) throws IOException {
         try {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            driveService.files().get(fileId).executeMediaAndDownloadTo(outputStream);
+            getDriveService().files().get(fileId).executeMediaAndDownloadTo(outputStream);
             return outputStream.toByteArray();
         } catch (IOException e) {
             logger.error("Error downloading file from Google Drive", e);
@@ -510,7 +529,7 @@ public class GoogleDriveService {
             logger.info("Downloading thumbnail for file ID: {}", fileId);
             
             // Get file metadata first to check MIME type
-            File file = driveService.files().get(fileId)
+            File file = getDriveService().files().get(fileId)
                     .setFields("id, name, mimeType, thumbnailLink, size")
                     .execute();
             
@@ -640,17 +659,17 @@ public class GoogleDriveService {
      */
     public File getFileDetails(String fileId) throws IOException {
         // Try to refresh the drive service if needed
-        try {
-            refreshDriveService();
-        } catch (Exception e) {
-            logger.warn("Error refreshing Drive service before getting file details", e);
-        }
+        // try {
+        //     refreshDriveService();
+        // } catch (Exception e) {
+        //     logger.warn("Error refreshing Drive service before getting file details", e);
+        // }
 
         logger.info("Getting file details for fileId: {}", fileId);
 
         try {
             // Request more fields than the basic list endpoint
-            File file = driveService.files().get(fileId)
+            File file = getDriveService().files().get(fileId)
                     .setFields("id, name, mimeType, thumbnailLink, webContentLink, webViewLink, parents, size")
                     .execute();
 
@@ -674,11 +693,11 @@ public class GoogleDriveService {
      */
     public File uploadImage(byte[] imageData, String fileName, String mimeType, String folderId) throws IOException {
         // Try to refresh the drive service if needed
-        try {
-            refreshDriveService();
-        } catch (Exception e) {
-            logger.warn("Error refreshing Drive service before uploading image", e);
-        }
+        // try {
+        //     refreshDriveService();
+        // } catch (Exception e) {
+        //     logger.warn("Error refreshing Drive service before uploading image", e);
+        // }
         
         logger.info("Uploading image to Google Drive: {}, size: {} bytes", fileName, imageData.length);
         
@@ -697,7 +716,7 @@ public class GoogleDriveService {
         
         // Upload file to Google Drive
         try {
-            File uploadedFile = driveService.files().create(fileMetadata, fileContent)
+            File uploadedFile = getDriveService().files().create(fileMetadata, fileContent)
                     .setFields("id, name, mimeType, modifiedTime, webViewLink, webContentLink")
                     .execute();
             

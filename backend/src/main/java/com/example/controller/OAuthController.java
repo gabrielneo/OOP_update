@@ -116,16 +116,32 @@ public class OAuthController {
             String redirectUri = "http://localhost:8080/auth/google/callback";
             logger.info("Using hardcoded redirect URI: {}", redirectUri);
 
+            // First check if there are any existing credentials
+            boolean hasExistingCredentials = false;
+            try {
+                var existingCredential = getFlow().loadCredential(USER_ID);
+                hasExistingCredentials = (existingCredential != null);
+                if (hasExistingCredentials) {
+                    logger.info("Found existing credential for user: {}", USER_ID);
+                }
+            } catch (Exception e) {
+                logger.warn("Error checking existing credentials", e);
+            }
+
+            // Always set approval_prompt=force to ensure we get a new refresh token
             AuthorizationCodeRequestUrl authorizationUrl = getFlow()
                     .newAuthorizationUrl()
                     .setRedirectUri(redirectUri)
-                    .setState("state-token");
+                    .setAccessType("offline")
+                    .setApprovalPrompt("force") // Force Google to show the account selection screen
+                    .setState("normal-" + System.currentTimeMillis());
 
             String url = authorizationUrl.build();
             logger.info("Generated authorization URL: {}", url);
 
             Map<String, String> response = new HashMap<>();
             response.put("url", url);
+            response.put("hasExistingCredentials", String.valueOf(hasExistingCredentials));
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -149,6 +165,36 @@ public class OAuthController {
             logger.info("State parameter: {}", state);
             logger.info("Using hardcoded redirect URI: {}", redirectUri);
 
+            // Check if this is a forced new login by state parameter
+            boolean isForcedNewLogin = state != null && state.startsWith("force-new-");
+            if (isForcedNewLogin) {
+                logger.info("This is a forced new login, performing complete credential reset");
+                // Clear all existing credentials from datastore
+                try {
+                    getFlow().getCredentialDataStore().clear();
+                    logger.info("Cleared entire credential datastore");
+                } catch (Exception e) {
+                    logger.error("Error clearing credential datastore during forced login", e);
+                }
+                
+                // Force flow object to be recreated
+                this.flow = null;
+            }
+
+            // Check for existing credentials before creating new ones
+            var existingCredential = getFlow().loadCredential(USER_ID);
+            if (existingCredential != null) {
+                logger.info("Found existing credential for user ID: {}", USER_ID);
+                logger.info("Existing credential has access token: {}", existingCredential.getAccessToken() != null);
+                logger.info("Existing credential has refresh token: {}", existingCredential.getRefreshToken() != null);
+                
+                // Delete existing credential to ensure clean replacement
+                logger.info("Deleting existing credential for clean replacement");
+                getFlow().getCredentialDataStore().delete(USER_ID);
+            } else {
+                logger.info("No existing credential found for user ID: {}", USER_ID);
+            }
+
             // Get the flow and create token request
             TokenResponse tokenResponse = getFlow()
                     .newTokenRequest(code)
@@ -158,12 +204,18 @@ public class OAuthController {
             // Log token information (partially redacted for security)
             logger.info("Received TokenResponse - access token exists: {}", tokenResponse.getAccessToken() != null);
             logger.info("Received TokenResponse - refresh token exists: {}", tokenResponse.getRefreshToken() != null);
+            
+            // Extra safety check - if no refresh token, log a warning
+            if (tokenResponse.getRefreshToken() == null) {
+                logger.warn("⚠️ NO REFRESH TOKEN RECEIVED! Authentication may not persist. " +
+                            "Use the /force-new-login endpoint to force a complete re-authentication.");
+            }
 
             // Store the credential with detailed logging
-            logger.info("About to store credential for user: {}", USER_ID);
+            logger.info("About to store new credential for user: {}", USER_ID);
             try {
                 getFlow().createAndStoreCredential(tokenResponse, USER_ID);
-                logger.info("Successfully stored credential");
+                logger.info("Successfully stored new credential, replacing any previous ones");
 
                 // Verify the credential was actually stored
                 var storedCred = getFlow().loadCredential(USER_ID);
@@ -192,6 +244,8 @@ public class OAuthController {
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Successfully authenticated with Google Drive");
+            response.put("wasForceNewLogin", isForcedNewLogin);
+            response.put("hasRefreshToken", tokenResponse.getRefreshToken() != null);
             response.put("redirectUrl", "http://localhost:5173/editingPage");
 
             logger.info("Successfully authenticated user with Google Drive");
@@ -227,10 +281,47 @@ public class OAuthController {
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout() {
         try {
-            getFlow().getCredentialDataStore().delete(USER_ID);
+            logger.info("Processing logout request for user ID: {}", USER_ID);
+            
+            // Check if credential exists before deleting
+            var credential = getFlow().loadCredential(USER_ID);
+            boolean hadCredential = (credential != null);
+            
+            if (hadCredential) {
+                logger.info("Found credential to delete, access token exists: {}", 
+                    credential.getAccessToken() != null);
+                logger.info("Found credential to delete, refresh token exists: {}", 
+                    credential.getRefreshToken() != null);
+            } else {
+                logger.info("No credential found to delete");
+            }
+            
+            // Delete the credential from the data store
+            try {
+                getFlow().getCredentialDataStore().delete(USER_ID);
+                logger.info("Credential deletion executed");
+            } catch (Exception e) {
+                logger.error("Error deleting credential from data store", e);
+            }
+            
+            // Verify credential was deleted
+            var checkCredential = getFlow().loadCredential(USER_ID);
+            boolean verifiedDeletion = (checkCredential == null);
+            logger.info("Verified credential deletion: {}", verifiedDeletion);
+            
+            // Try to refresh the Drive service to ensure it no longer has credentials
+            try {
+                Object driveService = applicationContext.getBean("googleDriveService");
+                java.lang.reflect.Method refreshMethod = driveService.getClass().getMethod("refreshDriveService");
+                boolean refreshed = (Boolean) refreshMethod.invoke(driveService);
+                logger.info("Drive service cleared: {}", refreshed);
+            } catch (Exception e) {
+                logger.error("Error refreshing drive service during logout", e);
+            }
 
             Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
+            response.put("success", verifiedDeletion);
+            response.put("hadCredential", hadCredential);
             response.put("message", "Successfully logged out");
 
             logger.info("User logged out successfully");
@@ -396,6 +487,75 @@ public class OAuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error fixing tokens", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/force-new-login")
+    public ResponseEntity<Map<String, Object>> forceNewLogin() {
+        try {
+            logger.info("Forcing new login by completely wiping all credentials");
+            Map<String, Object> response = new HashMap<>();
+            
+            // 1. Clear the credential datastore
+            try {
+                getFlow().getCredentialDataStore().clear();
+                logger.info("Cleared credential datastore");
+            } catch (Exception e) {
+                logger.error("Error clearing credential datastore", e);
+            }
+            
+            // 2. Delete physical token files
+            File tokensDirectory = new File(TOKENS_DIRECTORY_PATH);
+            boolean tokensDeleted = false;
+            
+            if (tokensDirectory.exists() && tokensDirectory.isDirectory()) {
+                String[] files = tokensDirectory.list();
+                if (files != null && files.length > 0) {
+                    for (String file : files) {
+                        File tokenFile = new File(tokensDirectory, file);
+                        boolean deleted = tokenFile.delete();
+                        logger.info("Deleted token file: {} - {}", file, deleted ? "success" : "failed");
+                    }
+                }
+                tokensDeleted = true;
+            }
+            
+            // 3. Recreate the tokens directory to ensure it's clean
+            if (tokensDirectory.exists()) {
+                try {
+                    for (File file : tokensDirectory.listFiles()) {
+                        file.delete();
+                    }
+                } catch (Exception e) {
+                    logger.error("Error deleting token files", e);
+                }
+            } else {
+                tokensDirectory.mkdirs();
+                logger.info("Created fresh tokens directory");
+            }
+            
+            // 4. Generate a new authorization URL with force approval
+            String redirectUri = "http://localhost:8080/auth/google/callback";
+            AuthorizationCodeRequestUrl authorizationUrl = getFlow()
+                    .newAuthorizationUrl()
+                    .setRedirectUri(redirectUri)
+                    .setApprovalPrompt("force") // Force approval screen to appear
+                    .setState("force-new-" + System.currentTimeMillis());
+
+            String url = authorizationUrl.build();
+            logger.info("Generated force-new-login URL: {}", url);
+            
+            response.put("success", true);
+            response.put("tokensDeleted", tokensDeleted);
+            response.put("url", url);
+            response.put("message", "All credentials cleared. Use the provided URL to login with a fresh Google account.");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error forcing new login", e);
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", e.getMessage());
             return ResponseEntity.internalServerError().body(errorResponse);
